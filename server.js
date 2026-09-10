@@ -155,7 +155,7 @@ app.post("/api/ai/generate",auth,async(req,res)=>{
     res.json({response,credits:req.user.credits-1});
   }catch(e){res.status(502).json({error:"Não foi possível conectar à IA agora."});}
 });
-
+app.post("/api/ai/image",auth,async(req,res)=>{const prompt=clean(req.body.prompt);if(!prompt)return res.status(400).json({error:"Descreva a imagem que deseja criar."});if(!process.env.AI_API_KEY)return res.status(500).json({error:"AI_API_KEY não configurada."});try{const r=await fetch("https://api.openai.com/v1/images/generations",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${process.env.AI_API_KEY}`},body:JSON.stringify({model:"gpt-image-2",prompt:prompt,size:"1024x1024"})});if(!r.ok)throw new Error("Falha no provedor de imagens");const data=await r.json();const image=data.data?.[0];if(!image)throw new Error("A imagem não foi gerada.");res.json({image_url:image.url||null,image_base64:image.b64_json||null})}catch(e){console.error("IMAGE_ERROR:",e);res.status(502).json({error:"Não foi possível gerar a imagem agora."})}});
 app.get("/api/plans",(req,res)=>res.json({plans:[
  {id:"FREE",name:"FREE",price:"R$ 0",credits:100},
  {id:"PRO_MONTHLY",name:"PRO Mensal",price:"Assinatura mensal",credits:1000,plan:"PRO",checkout:process.env.CHECKOUT_MONTHLY_URL||""},
