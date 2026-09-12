@@ -483,7 +483,7 @@ app.post("/api/ai/image",auth,async(req,res)=>{
       error:e.message||"Não foi possível gerar a imagem agora."
     });
   }
-});});
+});
 
 app.get("/api/plans",(req,res)=>
   res.json({
