@@ -746,3 +746,17 @@ app.listen(
       )
     )
 );
+
+app.listen(PORT,()=>{
+  console.log(`VÉRTEX AI rodando na porta ${PORT}`);
+});
+  "/{*splat}",
+  (req,res)=>
+    res.sendFile(
+      path.join(
+        __dirname,
+        "public",
+        "index.html"
+      )
+    )
+);
