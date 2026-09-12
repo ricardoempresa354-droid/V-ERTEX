@@ -1,21 +1,18 @@
 {
-  "name": "vertex-ai-saas",
-  "version": "2.0.0",
-  "type": "module",
+  "name": "vertex-ai",
+  "version": "1.0.0",
+  "description": "VÉRTEX AI - Assistente de marketing digital",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {
-    "@huggingface/inference": "^4.13.0",
-    "bcryptjs": "^3.0.2",
-    "better-sqlite3": "^13.0.3",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2"
-  },
   "engines": {
     "node": ">=24 <27"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
   }
 }
-  
