@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 
-let token=localStorage.getItem("vertex_token"),me=null,plansCache=[];
+let token=localStorage.getItem("vertex_token"),me=null,plansCache=[],activeProject=null,previousView="dashboard";
 
 const meta={
   dashboard:["Dashboard","Seu ponto de partida para renda extra no digital."],
@@ -28,6 +28,10 @@ async function api(url,opt={}){
   return d;
 }
 
+/* =========================
+   LOGIN / CADASTRO
+========================= */
+
 function authMode(mode){
   $("#loginTab").classList.toggle("on",mode==="login");
   $("#registerTab").classList.toggle("on",mode==="register");
@@ -38,10 +42,12 @@ function authMode(mode){
         <label>E-mail</label>
         <input id="email" type="email" required>
       </div>
+
       <div class="field">
         <label>Senha</label>
         <input id="password" type="password" required>
       </div>
+
       <button class="btn orange">Entrar</button>
     </form>`
   :`<form class="form" onsubmit="register(event)">
@@ -49,14 +55,17 @@ function authMode(mode){
         <label>Nome</label>
         <input id="name" required>
       </div>
+
       <div class="field">
         <label>E-mail</label>
         <input id="email" type="email" required>
       </div>
+
       <div class="field">
         <label>Senha</label>
         <input id="password" type="password" minlength="6" required>
       </div>
+
       <button class="btn orange">Criar minha conta</button>
     </form>`;
 }
@@ -74,7 +83,9 @@ async function login(e){
     });
 
     token=d.token;
+
     localStorage.setItem("vertex_token",token);
+
     start();
 
   }catch(e){
@@ -96,7 +107,9 @@ async function register(e){
     });
 
     token=d.token;
+
     localStorage.setItem("vertex_token",token);
+
     start();
 
   }catch(e){
@@ -116,11 +129,14 @@ async function start(){
     await loadPlans();
 
     renderAll();
+
     show("dashboard");
 
   }catch{
     localStorage.removeItem("vertex_token");
+
     token=null;
+
     $("#auth").classList.remove("hidden");
   }
 }
@@ -133,19 +149,32 @@ async function loadPlans(){
   }
 }
 
+/* =========================
+   NAVEGAÇÃO
+========================= */
+
 function show(id){
   $$('.view').forEach(x=>x.classList.remove('on'));
 
-  $("#"+id).classList.add('on');
+  const view=$("#"+id);
+
+  if(!view)return;
+
+  view.classList.add('on');
 
   $$('.side nav button').forEach(x=>
     x.classList.toggle('on',x.dataset.view===id)
   );
 
-  $("#title").textContent=meta[id][0];
-  $("#sub").textContent=meta[id][1];
+  if(meta[id]){
+    $("#title").textContent=meta[id][0];
+    $("#sub").textContent=meta[id][1];
+  }
 
-  document.body.classList.toggle('chat-mode',id==='workspace');
+  document.body.classList.toggle(
+    'chat-mode',
+    id==='workspace'
+  );
 
   if(id==='projects')loadProjects();
   if(id==='history')loadHistory();
@@ -155,6 +184,10 @@ function show(id){
 $$('.side nav button').forEach(b=>{
   b.onclick=()=>show(b.dataset.view);
 });
+
+/* =========================
+   DASHBOARD
+========================= */
 
 function dashboard(){
   return `
@@ -189,6 +222,7 @@ function dashboard(){
   <div class="grid">
 
     <div class="panel">
+
       <h2>O que você quer fazer?</h2>
 
       <div class="quick">
@@ -214,9 +248,11 @@ function dashboard(){
         </button>
 
       </div>
+
     </div>
 
     <div class="panel">
+
       <h2>Seu próximo passo</h2>
 
       <p class="muted">
@@ -225,62 +261,128 @@ function dashboard(){
         O VÉRTEX foi feito para responder dentro do nicho de renda extra.
       </p>
 
-      <button class="btn orange" onclick="show('workspace')">
+      <button class="btn orange" onclick="openAI('Estou começando do zero. Me guie passo a passo no nicho de renda extra.')">
         Falar com a IA
       </button>
+
     </div>
 
   </div>`;
 }
 
+/* =========================
+   CHAT
+========================= */
+
 function workspace(){
+
+  const projectTitle=activeProject
+    ?`<span class="project-name">• ${esc(activeProject.name)}</span>`
+    :'';
+
+  let initialMessage;
+
+  if(activeProject && activeProject.content){
+
+    initialMessage=`
+      <div class="msg ai">
+        ${activeProject.content}
+      </div>
+    `;
+
+  }else{
+
+    initialMessage=`
+      <div class="msg ai">
+        <b>VÉRTEX AI</b><br><br>
+        Olá, ${esc(me.name)}.
+        Pode me pedir para criar, explicar ou te guiar.
+        Meu foco é renda extra no digital.
+      </div>
+    `;
+
+  }
+
   return `
   <div class="chat-shell">
 
     <div class="chat-header">
-      <div>
-        <h2>VÉRTEX AI</h2>
-        <span>Especialista em renda extra</span>
+
+      <button
+        class="back-chat"
+        onclick="backFromChat()"
+      >
+        ←
+      </button>
+
+      <div class="chat-brand">
+
+        <h2>
+          VÉRTEX AI ${projectTitle}
+        </h2>
+
+        <span>
+          Especialista em renda extra
+        </span>
+
       </div>
+
     </div>
 
     <div class="tools">
 
-      <button class="tool" onclick="setPrompt('Me guia do zero para começar no nicho de renda extra.')">
+      <button
+        class="tool"
+        onclick="setPrompt('Me guia do zero para começar no nicho de renda extra.')"
+      >
         Começar do zero
       </button>
 
-      <button class="tool" onclick="setPrompt('Crie um criativo para anúncio de renda extra.')">
+      <button
+        class="tool"
+        onclick="setPrompt('Crie um criativo para anúncio de renda extra.')"
+      >
         Criativo
       </button>
 
-      <button class="tool" onclick="setPrompt('Crie 5 posts para Instagram sobre renda extra.')">
+      <button
+        class="tool"
+        onclick="setPrompt('Crie 5 posts para Instagram sobre renda extra.')"
+      >
         Posts
       </button>
 
-      <button class="tool" onclick="setPrompt('Crie uma copy de anúncio com gancho, benefícios e CTA.')">
+      <button
+        class="tool"
+        onclick="setPrompt('Crie uma copy de anúncio com gancho, benefícios e CTA.')"
+      >
         Copy
       </button>
 
-      <button class="tool" onclick="setPrompt('Monte uma estratégia de conteúdo de 7 dias para renda extra.')">
+      <button
+        class="tool"
+        onclick="setPrompt('Monte uma estratégia de conteúdo de 7 dias para renda extra.')"
+      >
         Estratégia
       </button>
 
     </div>
 
-    <div class="messages" id="messages">
+    <div
+      class="messages"
+      id="messages"
+    >
 
-      <div class="msg ai">
-        <b>VÉRTEX AI</b><br>
-        Olá, ${esc(me.name)}. Pode me pedir para criar,
-        explicar ou te guiar. Meu foco é renda extra no digital.
-      </div>
+      ${initialMessage}
 
     </div>
 
     <div class="composer-wrap">
 
-      <div id="plusMenu" class="plus-menu">
+      <div
+        id="plusMenu"
+        class="plus-menu"
+      >
 
         <button onclick="showFromPlus('projects')">
           📁 Projetos
@@ -302,7 +404,10 @@ function workspace(){
 
       <div class="composer">
 
-        <button class="plus-btn" onclick="togglePlusMenu()">
+        <button
+          class="plus-btn"
+          onclick="togglePlusMenu()"
+        >
           +
         </button>
 
@@ -312,7 +417,10 @@ function workspace(){
           onkeydown="handleChatKey(event)"
         ></textarea>
 
-        <button class="btn orange" onclick="sendAI()">
+        <button
+          class="btn orange"
+          onclick="sendAI()"
+        >
           ➤
         </button>
 
@@ -323,9 +431,14 @@ function workspace(){
   </div>`;
 }
 
+/* =========================
+   FERRAMENTAS
+========================= */
+
 function templates(){
   return `
   <div class="panel">
+
     <h2>Ferramentas para renda extra</h2>
 
     <div class="quick">
@@ -361,37 +474,56 @@ function templates(){
       </button>
 
     </div>
+
   </div>`;
 }
 
+/* =========================
+   BÔNUS
+========================= */
+
 async function loadBonuses(){
+
   const d=await api('/api/bonuses');
 
   $("#bonuses").innerHTML=`
+
   <div class="panel">
 
     <div class="row">
+
       <div>
+
         <h2>6 criativos bônus</h2>
+
         <p class="muted small">
           Você recebe exatamente 6 criativos prontos.
           Depois disso, continue criando com a IA através da assinatura.
         </p>
+
       </div>
 
-      <span class="badge">${d.remaining} restantes</span>
+      <span class="badge">
+        ${d.remaining} restantes
+      </span>
+
     </div>
 
     <div class="quick">
 
       ${d.items.map(x=>`
+
         <div class="card">
 
-          <b>${x.title}</b>
+          <b>${esc(x.title)}</b>
 
-          <div class="small muted">${x.type}</div>
+          <div class="small muted">
+            ${esc(x.type)}
+          </div>
 
-          <p class="small">${esc(x.copy)}</p>
+          <p class="small">
+            ${esc(x.copy)}
+          </p>
 
           <button
             class="btn ${d.used>=x.id?'ghost':'orange'}"
@@ -402,6 +534,7 @@ async function loadBonuses(){
           </button>
 
         </div>
+
       `).join('')}
 
     </div>
@@ -410,7 +543,9 @@ async function loadBonuses(){
 }
 
 async function useBonus(id){
+
   try{
+
     const d=await api('/api/bonuses/'+id+'/use',{
       method:'POST'
     });
@@ -420,52 +555,125 @@ async function useBonus(id){
     toast('Criativo bônus liberado');
 
     loadBonuses();
+
     renderAll();
 
   }catch(e){
+
     toast(e.message);
+
   }
 }
 
+/* =========================
+   PROJETOS
+========================= */
+
 async function loadProjects(){
-  const d=await api('/api/projects');
 
-  $("#projects").innerHTML=`
-  <div class="panel">
+  try{
 
-    <div class="row">
-      <h2>Meus projetos</h2>
+    const d=await api('/api/projects');
 
-      <button class="btn orange" onclick="newProject()">
-        + Novo projeto
-      </button>
-    </div>
+    $("#projects").innerHTML=`
 
-    ${
-      d.projects.length
-      ?d.projects.map(p=>`
-        <div class="listitem row">
+    <div class="panel">
 
-          <span>
-            <b>${esc(p.name)}</b><br>
-            <span class="small muted">
-              ${esc(p.content).slice(0,100)}
-            </span>
-          </span>
+      <div class="page-top">
 
-          <button class="btn ghost" onclick="editProject(${p.id})">
-            Abrir
+        <button
+          class="back-page"
+          onclick="show('workspace')"
+        >
+          ← Voltar ao chat
+        </button>
+
+        <div class="row">
+
+          <div>
+
+            <h2>Meus projetos</h2>
+
+            <p class="muted small">
+              Organize e continue seus projetos.
+            </p>
+
+          </div>
+
+          <button
+            class="btn orange"
+            onclick="newProject()"
+          >
+            + Novo projeto
           </button>
 
         </div>
-      `).join('')
-      :'<p class="muted">Nenhum projeto ainda.</p>'
-    }
 
-  </div>`;
+      </div>
+
+      ${
+        d.projects.length
+        ?
+        d.projects.map(p=>`
+
+          <div class="listitem project-row">
+
+            <div>
+
+              <b>
+                ${esc(p.name)}
+              </b>
+
+              <br>
+
+              <span class="small muted">
+                ${esc(p.content||'Projeto novo').slice(0,140)}
+              </span>
+
+            </div>
+
+            <div class="project-actions">
+
+              <button
+                class="btn orange"
+                onclick="continueProject(${p.id})"
+              >
+                Continuar
+              </button>
+
+              <button
+                class="btn ghost"
+                onclick="editProject(${p.id})"
+              >
+                Editar
+              </button>
+
+            </div>
+
+          </div>
+
+        `).join('')
+
+        :
+
+        `
+        <p class="muted">
+          Nenhum projeto ainda.
+        </p>
+        `
+      }
+
+    </div>`;
+
+  }catch(e){
+
+    toast(e.message);
+
+  }
 }
 
 async function newProject(){
+
   const name=prompt(
     'Nome do projeto:',
     'Minha campanha de renda extra'
@@ -473,79 +681,206 @@ async function newProject(){
 
   if(!name)return;
 
-  await api('/api/projects',{
-    method:'POST',
-    body:JSON.stringify({name})
-  });
+  try{
 
-  loadProjects();
+    await api('/api/projects',{
+      method:'POST',
+      body:JSON.stringify({
+        name
+      })
+    });
+
+    toast('Projeto criado');
+
+    loadProjects();
+
+  }catch(e){
+
+    toast(e.message);
+
+  }
 }
 
 async function editProject(id){
-  const d=await api('/api/projects');
 
-  const p=d.projects.find(x=>x.id===id);
+  try{
 
-  if(!p)return;
+    const d=await api('/api/projects');
 
-  const content=prompt(
-    'Conteúdo do projeto:',
-    p.content||''
-  );
+    const p=d.projects.find(x=>x.id===id);
 
-  if(content===null)return;
+    if(!p)return;
 
-  await api('/api/projects/'+id,{
-    method:'PUT',
-    body:JSON.stringify({
-      name:p.name,
-      content
-    })
-  });
+    const content=prompt(
+      'Conteúdo do projeto:',
+      p.content||''
+    );
 
-  toast('Projeto salvo');
+    if(content===null)return;
 
-  loadProjects();
+    await api('/api/projects/'+id,{
+      method:'PUT',
+      body:JSON.stringify({
+        name:p.name,
+        content
+      })
+    });
+
+    toast('Projeto salvo');
+
+    loadProjects();
+
+  }catch(e){
+
+    toast(e.message);
+
+  }
 }
+
+async function continueProject(id){
+
+  try{
+
+    const d=await api('/api/projects');
+
+    const p=d.projects.find(x=>x.id===id);
+
+    if(!p)return;
+
+    activeProject={
+      ...p
+    };
+
+    previousView='projects';
+
+    /*
+      Recria o HTML do chat para que
+      o projeto realmente apareça.
+    */
+
+    $("#workspace").innerHTML=workspace();
+
+    show('workspace');
+
+    setTimeout(()=>{
+
+      const m=$("#messages");
+
+      if(m){
+        m.scrollTop=m.scrollHeight;
+      }
+
+    },50);
+
+  }catch(e){
+
+    toast(e.message);
+
+  }
+}
+
+function backFromChat(){
+
+  activeProject=null;
+
+  show(previousView||'dashboard');
+
+}
+
+/* =========================
+   HISTÓRICO
+========================= */
 
 async function loadHistory(){
-  const d=await api('/api/history');
 
-  $("#history").innerHTML=`
-  <div class="panel">
+  try{
 
-    <h2>Histórico</h2>
+    const d=await api('/api/history');
 
-    ${
-      d.history.length
-      ?d.history.map(h=>`
-        <div class="listitem">
+    $("#history").innerHTML=`
 
-          <b>${esc(h.prompt).slice(0,120)}</b>
+    <div class="panel">
 
-          <p class="muted small">
-            ${esc(h.response).slice(0,250)}
-          </p>
+      <button
+        class="back-page"
+        onclick="show('workspace')"
+      >
+        ← Voltar ao chat
+      </button>
 
-        </div>
-      `).join('')
-      :'<p class="muted">Seu histórico aparecerá aqui.</p>'
-    }
+      <h2>Histórico</h2>
 
-  </div>`;
+      ${
+        d.history.length
+        ?
+        d.history.map(h=>`
+
+          <div class="listitem">
+
+            <b>
+              ${esc(h.prompt).slice(0,120)}
+            </b>
+
+            <p class="muted small">
+              ${esc(h.response).slice(0,250)}
+            </p>
+
+          </div>
+
+        `).join('')
+
+        :
+
+        `
+        <p class="muted">
+          Seu histórico aparecerá aqui.
+        </p>
+        `
+      }
+
+    </div>`;
+
+  }catch(e){
+
+    toast(e.message);
+
+  }
 }
 
+/* =========================
+   PLANOS
+========================= */
+
 function plans(){
+
   return `
+
+  <div class="page-top">
+
+    <button
+      class="back-page"
+      onclick="show('workspace')"
+    >
+      ← Voltar ao chat
+    </button>
+
+  </div>
+
   <div class="plans">
 
     ${plansCache.map(p=>`
 
-      <div class="card price ${p.id==='PRO_ANNUAL'?'featured':''}">
+      <div
+        class="card price ${p.id==='PRO_ANNUAL'?'featured':''}"
+      >
 
-        <h3>${p.name}</h3>
+        <h3>
+          ${esc(p.name)}
+        </h3>
 
-        <strong>${p.price}</strong>
+        <strong>
+          ${esc(p.price)}
+        </strong>
 
         <p class="muted">
           ${p.credits.toLocaleString('pt-BR')} créditos
@@ -553,30 +888,52 @@ function plans(){
 
         ${
           p.id==='FREE'
-          ?`
-            <p class="small muted">
-              Acesso inicial para conhecer o VÉRTEX.
-            </p>
 
-            <button class="btn ghost">
-              Plano atual
-            </button>
+          ?
+
           `
-          :`
-            <ul>
-              <li>IA especializada em renda extra</li>
-              <li>Posts, criativos, copies e estratégias</li>
-              <li>Suporte para iniciantes</li>
-              <li>Projetos e histórico</li>
-              <li>6 criativos bônus</li>
-            </ul>
+          <p class="small muted">
+            Acesso inicial para conhecer o VÉRTEX.
+          </p>
 
-            <button
-              class="btn orange"
-              onclick="checkout('${p.id}')"
-            >
-              Assinar ${p.name}
-            </button>
+          <button class="btn ghost">
+            Plano atual
+          </button>
+          `
+
+          :
+
+          `
+          <ul>
+
+            <li>
+              IA especializada em renda extra
+            </li>
+
+            <li>
+              Posts, criativos, copies e estratégias
+            </li>
+
+            <li>
+              Suporte para iniciantes
+            </li>
+
+            <li>
+              Projetos e histórico
+            </li>
+
+            <li>
+              6 criativos bônus
+            </li>
+
+          </ul>
+
+          <button
+            class="btn orange"
+            onclick="checkout('${esc(p.id)}')"
+          >
+            Assinar ${esc(p.name)}
+          </button>
           `
         }
 
@@ -586,9 +943,14 @@ function plans(){
 
   </div>
 
-  <div class="panel" style="margin-top:15px">
+  <div
+    class="panel"
+    style="margin-top:15px"
+  >
 
-    <b>Pagamento pela Cakto</b>
+    <b>
+      Pagamento pela Cakto
+    </b>
 
     <p class="small muted">
       Escolha mensal ou anual. Após o pagamento aprovado,
@@ -599,53 +961,97 @@ function plans(){
 }
 
 function checkout(plan){
-  const p=plansCache.find(x=>x.id===plan);
+
+  const p=plansCache.find(
+    x=>x.id===plan
+  );
 
   if(!p||!p.checkout){
-    toast('O checkout da Cakto ainda não foi configurado.');
+
+    toast(
+      'O checkout da Cakto ainda não foi configurado.'
+    );
+
     return;
   }
 
   let u=p.checkout;
 
-  const sep=u.includes('?')?'&':'?';
+  const sep=u.includes('?')
+    ?'&'
+    :'?';
 
   u+=sep+
     'name='+encodeURIComponent(me.name)+
     '&email='+encodeURIComponent(me.email);
 
-  window.open(u,'_blank','noopener');
+  window.open(
+    u,
+    '_blank',
+    'noopener'
+  );
 }
 
+/* =========================
+   CONFIGURAÇÕES
+========================= */
+
 function settings(){
+
   return `
+
   <div class="panel">
 
-    <h2>Configurações</h2>
+    <button
+      class="back-page"
+      onclick="show('workspace')"
+    >
+      ← Voltar ao chat
+    </button>
+
+    <h2>
+      Configurações
+    </h2>
 
     <div class="form">
 
       <div class="field">
-        <label>Nome</label>
+
+        <label>
+          Nome
+        </label>
+
         <input
           id="accountName"
           value="${esc(me.name)}"
         >
+
       </div>
 
       <div class="field">
-        <label>E-mail</label>
+
+        <label>
+          E-mail
+        </label>
+
         <input
           value="${esc(me.email)}"
           disabled
         >
+
       </div>
 
-      <button class="btn orange" onclick="saveAccount()">
+      <button
+        class="btn orange"
+        onclick="saveAccount()"
+      >
         Salvar alterações
       </button>
 
-      <button class="btn ghost" onclick="logout()">
+      <button
+        class="btn ghost"
+        onclick="logout()"
+      >
         Sair da conta
       </button>
 
@@ -655,7 +1061,9 @@ function settings(){
 }
 
 async function saveAccount(){
+
   try{
+
     const d=await api('/api/account',{
       method:'PUT',
       body:JSON.stringify({
@@ -670,35 +1078,71 @@ async function saveAccount(){
     toast('Conta atualizada');
 
   }catch(e){
+
     toast(e.message);
+
   }
 }
 
+/* =========================
+   RENDER
+========================= */
+
 function renderAll(){
+
   $('#dashboard').innerHTML=dashboard();
+
   $('#workspace').innerHTML=workspace();
+
   $('#templates').innerHTML=templates();
+
   $('#bonuses').innerHTML='';
+
   $('#projects').innerHTML='';
+
   $('#history').innerHTML='';
+
   $('#plans').innerHTML=plans();
+
   $('#settings').innerHTML=settings();
 }
 
+/* =========================
+   ABRIR IA
+========================= */
+
 function openAI(t){
+
+  activeProject=null;
+
+  previousView='dashboard';
+
+  $("#workspace").innerHTML=workspace();
+
   show('workspace');
 
   setTimeout(()=>{
     setPrompt(t);
-  },30);
+  },50);
 }
 
 function setPrompt(t){
-  $('#prompt').value=t;
-  $('#prompt').focus();
+
+  const p=$('#prompt');
+
+  if(!p)return;
+
+  p.value=t;
+
+  p.focus();
 }
 
+/* =========================
+   MENU +
+========================= */
+
 function togglePlusMenu(){
+
   const menu=$("#plusMenu");
 
   if(menu){
@@ -707,29 +1151,53 @@ function togglePlusMenu(){
 }
 
 function showFromPlus(id){
+
   const menu=$("#plusMenu");
 
   if(menu){
     menu.classList.remove("open");
   }
 
+  previousView='workspace';
+
   show(id);
 }
 
 function handleChatKey(e){
-  if(e.key==="Enter"&&!e.shiftKey){
+
+  if(
+    e.key==="Enter" &&
+    !e.shiftKey
+  ){
+
     e.preventDefault();
+
     sendAI();
+
   }
 }
 
+/* =========================
+   ENVIAR PARA IA
+========================= */
+
 async function sendAI(){
+
   const p=$('#prompt');
+
+  if(!p)return;
+
   const t=p.value.trim();
 
   if(!t)return;
 
   const m=$('#messages');
+
+  if(!m)return;
+
+  /*
+    Mensagem do usuário
+  */
 
   m.insertAdjacentHTML(
     'beforeend',
@@ -738,6 +1206,10 @@ async function sendAI(){
 
   p.value='';
 
+  /*
+    Mensagem de carregamento
+  */
+
   m.insertAdjacentHTML(
     'beforeend',
     `<div class="msg ai">Gerando...</div>`
@@ -745,19 +1217,52 @@ async function sendAI(){
 
   const loading=m.lastElementChild;
 
+  m.scrollTop=m.scrollHeight;
+
   try{
-    const d=await api('/api/ai/generate',{
-      method:'POST',
-      body:JSON.stringify({
-        prompt:t
-      })
-    });
+
+    const d=await api(
+      '/api/ai/generate',
+      {
+        method:'POST',
+
+        body:JSON.stringify({
+          prompt:t
+        })
+      }
+    );
 
     loading.innerHTML=
-      '<b>Minha Renda</b><br><br>'+
-      esc(d.response).replace(/\n/g,'<br>');
+      '<b>VÉRTEX AI</b><br><br>'+
+      esc(d.response).replace(
+        /\n/g,
+        '<br>'
+      );
 
     me.credits=d.credits;
+
+    /*
+      Se estiver dentro de um projeto,
+      salva a conversa automaticamente.
+    */
+
+    if(activeProject){
+
+      activeProject.content=m.innerHTML;
+
+      await api(
+        '/api/projects/'+activeProject.id,
+        {
+          method:'PUT',
+
+          body:JSON.stringify({
+            name:activeProject.name,
+            content:activeProject.content
+          })
+        }
+      );
+
+    }
 
   }catch(e){
 
@@ -771,6 +1276,10 @@ async function sendAI(){
   m.scrollTop=m.scrollHeight;
 }
 
+/* =========================
+   GERAR IMAGEM
+========================= */
+
 async function generateImage(){
 
   const t=window.prompt(
@@ -781,73 +1290,113 @@ async function generateImage(){
 
   const m=$('#messages');
 
+  if(!m)return;
+
   m.insertAdjacentHTML(
     'beforeend',
-    `<div class="msg me">🖼️ ${esc(t)}</div>`
+    `<div class="msg me">
+      🖼️ ${esc(t)}
+    </div>`
   );
 
   m.insertAdjacentHTML(
     'beforeend',
-    `<div class="msg ai">🖼️ Criando imagem...</div>`
+    `<div class="msg ai">
+      🖼️ Criando imagem...
+    </div>`
   );
 
   const loading=m.lastElementChild;
 
+  m.scrollTop=m.scrollHeight;
+
   try{
 
-    const d=await api('/api/ai/image',{
-      method:'POST',
-      body:JSON.stringify({
-        prompt:t.trim()
-      })
-    });
+    const d=await api(
+      '/api/ai/image',
+      {
+        method:'POST',
+
+        body:JSON.stringify({
+          prompt:t.trim()
+        })
+      }
+    );
 
     if(d.image_url){
 
       loading.innerHTML=
         `<b>VÉRTEX AI</b><br><br>
+
         <img
-          src="${d.image_url}"
+          src="${esc(d.image_url)}"
           alt="Imagem gerada pelo VÉRTEX AI"
-          style="max-width:100%;border-radius:12px;display:block"
+          style="
+            max-width:100%;
+            border-radius:12px;
+            display:block
+          "
         >`;
 
     }else if(d.image_base64){
 
       loading.innerHTML=
         `<b>VÉRTEX AI</b><br><br>
+
         <img
           src="data:image/png;base64,${d.image_base64}"
           alt="Imagem gerada pelo VÉRTEX AI"
-          style="max-width:100%;border-radius:12px;display:block"
+          style="
+            max-width:100%;
+            border-radius:12px;
+            display:block
+          "
         >`;
 
     }else{
 
       loading.innerHTML=
-        '<span class="error">A imagem não foi gerada.</span>';
+        '<span class="error">'+
+        'A imagem não foi gerada.'+
+        '</span>';
 
     }
 
   }catch(e){
 
     loading.innerHTML=
-      `<span class="error">${esc(e.message)}</span>`;
+      `<span class="error">
+        ${esc(e.message)}
+      </span>`;
 
   }
 
   m.scrollTop=m.scrollHeight;
 }
 
+/* =========================
+   LOGOUT
+========================= */
+
 function logout(){
-  localStorage.removeItem('vertex_token');
+
+  localStorage.removeItem(
+    'vertex_token'
+  );
+
   location.reload();
 }
 
+/* =========================
+   TOAST
+========================= */
+
 function toast(t){
+
   const x=document.createElement('div');
 
   x.className='toast';
+
   x.textContent=t;
 
   document.body.appendChild(x);
@@ -857,9 +1406,15 @@ function toast(t){
   },2500);
 }
 
+/* =========================
+   ESCAPAR HTML
+========================= */
+
 function esc(s){
+
   return String(s??'').replace(
     /[&<>"']/g,
+
     c=>({
       '&':'&amp;',
       '<':'&lt;',
@@ -869,6 +1424,10 @@ function esc(s){
     }[c])
   );
 }
+
+/* =========================
+   INICIALIZAÇÃO
+========================= */
 
 authMode('login');
 
