@@ -423,81 +423,67 @@ app.post("/api/ai/image",auth,async(req,res)=>{
       error:"Descreva a imagem que deseja criar."
     });
 
-  if(!process.env.AI_API_KEY)
+  if(!process.env.HF_TOKEN)
     return res.status(500).json({
-      error:"AI_API_KEY não configurada no Railway."
+      error:"HF_TOKEN não configurado no Railway."
     });
 
   try{
 
     const r=await fetch(
-      "https://api.openai.com/v1/images/generations",
+      "https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell",
       {
         method:"POST",
 
         headers:{
-          "Content-Type":"application/json",
-          "Authorization":`Bearer ${process.env.AI_API_KEY}`
+          "Authorization":`Bearer ${process.env.HF_TOKEN}`,
+          "Content-Type":"application/json"
         },
 
         body:JSON.stringify({
-          model:"gpt-image-2",
-          prompt:prompt,
-          size:"1024x1024"
+          inputs:prompt
         })
       }
     );
 
-    const data=await r.json().catch(()=>({}));
-
     if(!r.ok){
 
-      console.error(
-        "IMAGE_PROVIDER_ERROR:",
-        data
-      );
-
-      const msg=
-        data?.error?.message ||
-        data?.error ||
-        "Erro desconhecido no provedor de imagens.";
-
-      return res.status(r.status).json({
-        error:String(msg)
-      });
-    }
-
-    const image=data.data?.[0];
-
-    if(!image){
+      const text=await r.text();
 
       console.error(
-        "IMAGE_EMPTY_RESPONSE:",
-        data
+        "HF_IMAGE_ERROR:",
+        text
       );
 
       return res.status(502).json({
-        error:"O provedor não retornou uma imagem."
+        error:"O provedor de imagens não conseguiu gerar a imagem agora."
       });
     }
 
+    const buffer=Buffer.from(
+      await r.arrayBuffer()
+    );
+
+    const image_base64=buffer.toString("base64");
+
     res.json({
-      image_url:image.url||null,
-      image_base64:image.b64_json||null
+      image_url:null,
+      image_base64,
+      mime_type:"image/png"
     });
 
   }catch(e){
 
     console.error(
-      "IMAGE_ERROR:",
+      "HF_IMAGE_ERROR:",
       e
     );
 
     res.status(502).json({
-      error:e.message||"Erro ao gerar imagem."
+      error:e.message||"Não foi possível gerar a imagem agora."
     });
   }
-});
+});});
 
 app.get("/api/plans",(req,res)=>
   res.json({
