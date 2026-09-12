@@ -721,13 +721,7 @@ app.put("/api/account",auth,(req,res)=>{
   res.json({user});
 });
 
-app.get(
-  "*",
-  (req,res)=>
-    res.sendFile(
-      path.join(
-        __dirname,
-       app.get("/{*splat}", (req, res) => {
+app.get("/{*splat}", (req, res) => {
   res.sendFile(
     path.join(__dirname, "public", "index.html")
   );
