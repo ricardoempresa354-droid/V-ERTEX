@@ -735,7 +735,14 @@ app.get(
 
 app.listen(
   PORT,
-  ()=>console.log(
-    `VÉRTEX AI rodando em http://localhost:${PORT}`
-  )
+ app.get(
+  "/{*splat}",
+  (req,res)=>
+    res.sendFile(
+      path.join(
+        __dirname,
+        "public",
+        "index.html"
+      )
+    )
 );
