@@ -1,23 +1,15 @@
-const app = document.getElementById("app");
+const API = "/api";
 
 let token = localStorage.getItem("vertex_token");
-let user = null;
+let me = null;
 let chats = [];
-let currentChat = null;
-let loading = false;
+let currentChatId = null;
+let messages = [];
+let currentPage = "chat";
 
-const suggestions = [
-  "Quero começar do zero no marketing digital",
-  "Crie um anúncio para um produto digital",
-  "Me dê 7 ideias de posts para Instagram",
-  "Crie uma estratégia de vendas para iniciantes"
-];
+const app = document.getElementById("app");
 
-/* =========================
-   API
-========================= */
-
-async function api(url, options = {}) {
+async function api(path, options = {}) {
   const headers = {
     "Content-Type": "application/json",
     ...(options.headers || {})
@@ -27,7 +19,7 @@ async function api(url, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(API + path, {
     ...options,
     headers
   });
@@ -36,9 +28,7 @@ async function api(url, options = {}) {
 
   try {
     data = await response.json();
-  } catch {
-    data = {};
-  }
+  } catch {}
 
   if (!response.ok) {
     throw new Error(data.error || "Ocorreu um erro.");
@@ -47,1714 +37,1161 @@ async function api(url, options = {}) {
   return data;
 }
 
-/* =========================
-   UTILIDADES
-========================= */
-
-function escapeHTML(text) {
-  return String(text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function initials(name) {
   return String(name || "U")
-    .trim()
-    .split(/\s+/)
+    .split(" ")
+    .filter(Boolean)
     .slice(0, 2)
-    .map(word => word[0])
+    .map(x => x[0])
     .join("")
     .toUpperCase();
+}
+
+function vertexIcon(className = "vertex-avatar") {
+  return `
+    <div class="${className}">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M7 7
+          L15 7
+          L20 22
+          L26 7
+          L34 7
+          L25 33
+          L17 33
+          Z"></path>
+      </svg>
+    </div>
+  `;
 }
 
 /* =========================
    LOGIN
 ========================= */
 
-function showLogin(register = false) {
+function renderLogin() {
   app.innerHTML = `
-    <div class="auth-screen">
+    <div class="login-page">
+      <div class="login-box">
 
-      <div class="auth-box">
+        <div class="login-brand">
+          ${vertexIcon("vertex-logo")}
+          <h1>VÉRTEX AI</h1>
+          <p>Seu assistente de marketing digital</p>
+        </div>
 
-        <div class="auth-logo">
-          <div class="auth-v-logo">
-            V
+        <div class="auth-box">
+
+          <div class="auth-tabs">
+            <button class="auth-tab active" id="loginTab">
+              Entrar
+            </button>
+
+            <button class="auth-tab" id="registerTab">
+              Criar conta
+            </button>
           </div>
 
-          <h1>VÉRTEX AI</h1>
-
-          <p>
-            Seu assistente inteligente para o digital
-          </p>
-        </div>
-
-        <h2>
-          ${register ? "Criar sua conta" : "Entrar no VÉRTEX"}
-        </h2>
-
-        <form class="auth-form" id="authForm">
-
-          ${
-            register
-              ? `
-                <input
-                  id="name"
-                  type="text"
-                  placeholder="Seu nome"
-                  autocomplete="name"
-                  required
-                >
-              `
-              : ""
-          }
-
-          <input
-            id="email"
-            type="email"
-            placeholder="Seu e-mail"
-            autocomplete="email"
-            required
-          >
-
-          <input
-            id="password"
-            type="password"
-            placeholder="Sua senha"
-            autocomplete="${register ? "new-password" : "current-password"}"
-            required
-          >
-
-          <button
-            class="primary-btn"
-            type="submit"
-          >
-            ${register ? "Criar conta" : "Entrar"}
-          </button>
-
-        </form>
-
-        <div class="auth-switch">
-
-          ${
-            register
-              ? `
-                Já possui uma conta?
-                <button id="switchAuth">
-                  Entrar
-                </button>
-              `
-              : `
-                Ainda não possui conta?
-                <button id="switchAuth">
-                  Criar conta
-                </button>
-              `
-          }
+          <div id="authForm"></div>
 
         </div>
-
       </div>
-
     </div>
   `;
 
-  document
-    .getElementById("authForm")
-    .addEventListener("submit", event => {
-      event.preventDefault();
-      submitAuth(register);
-    });
+  renderLoginForm();
 
-  document
-    .getElementById("switchAuth")
-    .addEventListener("click", () => {
-      showLogin(!register);
-    });
+  document.getElementById("loginTab").onclick = () => {
+    document.getElementById("loginTab").classList.add("active");
+    document.getElementById("registerTab").classList.remove("active");
+    renderLoginForm();
+  };
+
+  document.getElementById("registerTab").onclick = () => {
+    document.getElementById("registerTab").classList.add("active");
+    document.getElementById("loginTab").classList.remove("active");
+    renderRegisterForm();
+  };
 }
 
-async function submitAuth(register) {
-  const email =
-    document.getElementById("email").value.trim();
+function renderLoginForm() {
+  document.getElementById("authForm").innerHTML = `
+    <form id="loginForm">
 
-  const password =
-    document.getElementById("password").value;
+      <div id="authError"></div>
 
-  try {
-    let data;
+      <input
+        id="email"
+        class="input"
+        type="email"
+        placeholder="Seu e-mail"
+        required
+      >
 
-    if (register) {
-      const name =
-        document.getElementById("name").value.trim();
+      <input
+        id="password"
+        class="input"
+        type="password"
+        placeholder="Sua senha"
+        required
+      >
 
-      data = await api("/api/auth/register", {
+      <button class="primary-button auth-submit" type="submit">
+        Entrar na VÉRTEX
+      </button>
+
+    </form>
+  `;
+
+  document.getElementById("loginForm").onsubmit = async e => {
+    e.preventDefault();
+
+    const error = document.getElementById("authError");
+    error.className = "auth-error";
+    error.textContent = "";
+
+    try {
+      const data = await api("/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          name,
-          email,
-          password
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value
         })
       });
-    } else {
-      data = await api("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email,
-          password
-        })
-      });
+
+      token = data.token;
+      localStorage.setItem("vertex_token", token);
+
+      await startApp();
+    } catch (err) {
+      error.textContent = err.message;
     }
+  };
+}
 
-    token = data.token;
+function renderRegisterForm() {
+  document.getElementById("authForm").innerHTML = `
+    <form id="registerForm">
 
-    localStorage.setItem(
-      "vertex_token",
-      token
-    );
+      <div id="authError"></div>
 
-    user = data.user;
+      <input
+        id="name"
+        class="input"
+        placeholder="Seu nome"
+        required
+      >
 
-    await startApp();
+      <input
+        id="email"
+        class="input"
+        type="email"
+        placeholder="Seu e-mail"
+        required
+      >
 
-  } catch (error) {
-    alert(error.message);
-  }
+      <input
+        id="password"
+        class="input"
+        type="password"
+        placeholder="Crie uma senha"
+        minlength="6"
+        required
+      >
+
+      <button class="primary-button auth-submit" type="submit">
+        Criar minha conta
+      </button>
+
+    </form>
+  `;
+
+  document.getElementById("registerForm").onsubmit = async e => {
+    e.preventDefault();
+
+    const error = document.getElementById("authError");
+    error.className = "auth-error";
+    error.textContent = "";
+
+    try {
+      const data = await api("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: document.getElementById("name").value,
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value
+        })
+      });
+
+      token = data.token;
+      localStorage.setItem("vertex_token", token);
+
+      await startApp();
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
 }
 
 /* =========================
-   INICIALIZAÇÃO
+   APP
 ========================= */
 
 async function startApp() {
   try {
-    const data = await api("/api/me");
+    const data = await api("/me");
 
-    user = data.user;
+    me = data.user;
 
     await loadChats();
 
     renderApp();
 
+    if (chats.length) {
+      await openChat(chats[0].id);
+    } else {
+      await newChat();
+    }
   } catch {
     token = null;
-    user = null;
-
-    localStorage.removeItem(
-      "vertex_token"
-    );
-
-    showLogin(false);
+    localStorage.removeItem("vertex_token");
+    renderLogin();
   }
 }
 
 async function loadChats() {
-  try {
-    const data =
-      await api("/api/chats");
-
-    chats =
-      Array.isArray(data.chats)
-        ? data.chats
-        : [];
-
-  } catch {
-    chats = [];
-  }
+  const data = await api("/chats");
+  chats = data.chats || [];
 }
-
-/* =========================
-   APLICAÇÃO
-========================= */
 
 function renderApp() {
   app.innerHTML = `
     <div class="app-shell">
 
-      <aside
-        class="sidebar"
-        id="sidebar"
-      >
+      <aside class="sidebar" id="sidebar">
 
         <div class="sidebar-top">
 
-          <div class="logo-small">
-            <span class="logo-v">
-              V
-            </span>
-
-            <span>
-              VÉRTEX
-            </span>
+          <div class="brand">
+            ${vertexIcon("vertex-logo")}
+            <span>VÉRTEX AI</span>
           </div>
 
-          <button
-            class="new-chat"
-            id="newChatBtn"
-            title="Nova conversa"
-          >
-            +
+          <button class="new-chat" id="newChat">
+            ＋ Nova conversa
           </button>
 
         </div>
 
         <nav class="sidebar-nav">
 
-          <button
-            class="nav-item active"
-            data-page="chat"
-          >
-            <span>💬</span>
-            Conversa
+          <button class="nav-item active" data-page="chat">
+            💬 Chat
           </button>
 
-          <button
-            class="nav-item"
-            data-page="history"
-          >
-            <span>🕘</span>
-            Histórico
+          <button class="nav-item" data-page="history">
+            🕘 Histórico
           </button>
 
-          <button
-            class="nav-item"
-            data-page="projects"
-          >
-            <span>📁</span>
-            Projetos
+          <button class="nav-item" data-page="projects">
+            📁 Projetos
           </button>
 
-          <button
-            class="nav-item"
-            data-page="plans"
-          >
-            <span>💳</span>
-            Planos
+          <button class="nav-item" data-page="plans">
+            💳 Planos
           </button>
 
-          <button
-            class="nav-item"
-            data-page="settings"
-          >
-            <span>⚙️</span>
-            Configurações
+          <button class="nav-item" data-page="settings">
+            ⚙️ Configurações
           </button>
 
         </nav>
 
-        <div class="chat-history">
+        <div class="chat-list">
 
-          <div class="chat-history-title">
-            Conversas recentes
+          <div class="chat-list-title">
+            CONVERSAS
           </div>
 
-          <div id="chatHistoryList"></div>
+          <div id="chatList"></div>
 
         </div>
 
-        <div class="sidebar-bottom">
+        <div class="sidebar-user">
 
-          <div class="user-mini">
+          <div class="user-avatar">
+            ${initials(me?.name)}
+          </div>
 
-            <div class="avatar user-avatar">
-              ${escapeHTML(
-                initials(user?.name)
-              )}
+          <div class="user-info">
+            <div class="user-name">
+              ${escapeHtml(me?.name)}
             </div>
 
-            <div class="user-info">
-
-              <div class="user-name">
-                ${escapeHTML(
-                  user?.name || "Usuário"
-                )}
-              </div>
-
-              <div class="user-plan">
-                Plano
-                ${escapeHTML(
-                  user?.plan || "FREE"
-                )}
-              </div>
-
+            <div class="user-plan">
+              Plano ${escapeHtml(me?.plan || "FREE")}
             </div>
-
-            <button
-              class="logout-btn"
-              id="logoutBtn"
-              title="Sair"
-            >
-              ↪
-            </button>
-
           </div>
 
         </div>
 
       </aside>
 
+      <div
+        class="sidebar-overlay"
+        id="sidebarOverlay"
+      ></div>
+
       <main class="main">
 
         <header class="topbar">
 
-          <button
-            class="icon-btn mobile-menu"
-            id="mobileMenuBtn"
-            title="Menu"
-          >
-            ☰
-          </button>
-
-          <div
-            class="top-title"
-            id="topTitle"
-          >
-            VÉRTEX AI
-          </div>
-
-          <div class="top-actions">
+          <div class="topbar-left">
 
             <button
-              class="icon-btn"
-              id="topNewChat"
-              title="Nova conversa"
+              class="menu-button mobile-menu"
+              id="mobileMenu"
             >
-              ✎
+              ☰
             </button>
 
-            <div class="avatar user-avatar">
-              ${escapeHTML(
-                initials(user?.name)
-              )}
+            <div class="topbar-logo">
+              ${vertexIcon("vertex-logo")}
+              <strong>VÉRTEX AI</strong>
+            </div>
+
+          </div>
+
+          <div class="topbar-right">
+
+            <div class="user-avatar">
+              ${initials(me?.name)}
             </div>
 
           </div>
 
         </header>
 
-        <section
-          class="chat-page"
-          id="mainContent"
-        ></section>
+        <section class="content" id="content"></section>
 
       </main>
 
     </div>
   `;
 
-  bindMainEvents();
+  document.getElementById("newChat").onclick = newChat;
 
-  renderChatHistory();
+  document.getElementById("mobileMenu").onclick = () => {
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("sidebarOverlay").classList.add("open");
+  };
 
-  renderChatPage();
+  document.getElementById("sidebarOverlay").onclick = closeMobileMenu;
+
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.onclick = () => {
+      currentPage = btn.dataset.page;
+      updateNav();
+      renderPage();
+      closeMobileMenu();
+    };
+  });
+
+  updateNav();
+  renderPage();
+  renderChatList();
+}
+
+function closeMobileMenu() {
+  document.getElementById("sidebar")?.classList.remove("open");
+  document.getElementById("sidebarOverlay")?.classList.remove("open");
+}
+
+function updateNav() {
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.classList.toggle(
+      "active",
+      btn.dataset.page === currentPage
+    );
+  });
 }
 
 /* =========================
-   EVENTOS PRINCIPAIS
+   CHAT
 ========================= */
 
-function bindMainEvents() {
-
-  document
-    .querySelectorAll(".nav-item")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const page =
-            button.dataset.page;
-
-          document
-            .querySelectorAll(".nav-item")
-            .forEach(item =>
-              item.classList.remove("active")
-            );
-
-          button.classList.add("active");
-
-          if (page === "chat")
-            renderChatPage();
-
-          if (page === "history")
-            renderHistoryPage();
-
-          if (page === "projects")
-            renderProjectsPage();
-
-          if (page === "plans")
-            renderPlansPage();
-
-          if (page === "settings")
-            renderSettingsPage();
-
-          closeMobileSidebar();
-        }
-      );
-
-    });
-
-  document
-    .getElementById("newChatBtn")
-    .addEventListener(
-      "click",
-      newChat
-    );
-
-  document
-    .getElementById("topNewChat")
-    .addEventListener(
-      "click",
-      newChat
-    );
-
-  document
-    .getElementById("logoutBtn")
-    .addEventListener(
-      "click",
-      logout
-    );
-
-  document
-    .getElementById("mobileMenuBtn")
-    .addEventListener(
-      "click",
-      () => {
-
-        document
-          .getElementById("sidebar")
-          .classList.toggle("open");
-
-      }
-    );
-}
-
-function closeMobileSidebar() {
-  document
-    .getElementById("sidebar")
-    ?.classList.remove("open");
-}
-
-/* =========================
-   HISTÓRICO SIDEBAR
-========================= */
-
-function renderChatHistory() {
-
-  const container =
-    document.getElementById(
-      "chatHistoryList"
-    );
-
-  if (!container) return;
-
-  if (!chats.length) {
-
-    container.innerHTML = `
-      <div class="empty-history">
-        Nenhuma conversa ainda
-      </div>
-    `;
-
-    return;
+function renderPage() {
+  if (currentPage === "chat") {
+    renderChat();
   }
 
-  container.innerHTML =
-    chats
-      .slice(0, 20)
-      .map(
-        chat => `
-          <button
-            class="chat-history-item"
-            data-chat-id="${chat.id}"
-          >
-            ${escapeHTML(
-              chat.title ||
-              "Nova conversa"
-            )}
-          </button>
-        `
-      )
-      .join("");
+  if (currentPage === "history") {
+    renderHistory();
+  }
 
-  container
-    .querySelectorAll(
-      ".chat-history-item"
-    )
-    .forEach(button => {
+  if (currentPage === "projects") {
+    renderProjects();
+  }
 
-      button.addEventListener(
-        "click",
-        async () => {
+  if (currentPage === "plans") {
+    renderPlans();
+  }
 
-          await openChat(
-            Number(
-              button.dataset.chatId
-            )
-          );
-
-          closeMobileSidebar();
-        }
-      );
-
-    });
+  if (currentPage === "settings") {
+    renderSettings();
+  }
 }
 
-/* =========================
-   PÁGINA DO CHAT
-========================= */
+function renderChat() {
+  const content = document.getElementById("content");
 
-function renderChatPage() {
+  content.innerHTML = `
+    <div class="chat-page">
 
-  const main =
-    document.getElementById(
-      "mainContent"
-    );
-
-  if (!main) return;
-
-  main.className =
-    "chat-page";
-
-  document.getElementById(
-    "topTitle"
-  ).textContent =
-    "VÉRTEX AI";
-
-  main.innerHTML = `
-    <div
-      class="messages"
-      id="messagesArea"
-    >
+      <div class="welcome" id="welcome"></div>
 
       <div
-        class="message-list"
-        id="messageList"
+        class="messages"
+        id="messages"
+        style="display:none"
       ></div>
 
-    </div>
+      <div class="composer-area">
 
-    <div class="composer-area">
+        <div class="composer">
 
-      <div
-        class="plus-menu"
-        id="plusMenu"
-        style="display:none;"
-      >
+          <div class="plus-wrap">
 
-        <button data-action="projects">
-          📁 Projetos
-        </button>
+            <button
+              class="plus-button"
+              id="plusButton"
+            >
+              +
+            </button>
 
-        <button data-action="history">
-          🕘 Histórico
-        </button>
+            <div class="plus-menu" id="plusMenu">
 
-        <button data-action="plans">
-          💳 Planos
-        </button>
+              <button
+                class="plus-option"
+                data-action="projects"
+              >
+                📁 Projetos
+              </button>
 
-        <button data-action="settings">
-          ⚙️ Configurações
-        </button>
+              <button
+                class="plus-option"
+                data-action="history"
+              >
+                🕘 Histórico
+              </button>
 
-      </div>
+              <button
+                class="plus-option"
+                data-action="plans"
+              >
+                💳 Planos
+              </button>
 
-      <div class="composer">
+              <button
+                class="plus-option"
+                data-action="settings"
+              >
+                ⚙️ Configurações
+              </button>
 
-        <button
-          class="plus-btn"
-          id="plusBtn"
-          title="Mais opções"
-        >
-          +
-        </button>
+            </div>
 
-        <textarea
-          id="messageInput"
-          placeholder="Mensagem para o VÉRTEX..."
-          rows="1"
-        ></textarea>
+          </div>
 
-        <button
-          class="send-btn"
-          id="sendBtn"
-          title="Enviar"
-          disabled
-        >
-          ↑
-        </button>
+          <textarea
+            id="messageInput"
+            rows="1"
+            placeholder="Pergunte qualquer coisa para a VÉRTEX..."
+          ></textarea>
 
-      </div>
+          <button
+            class="send-button"
+            id="sendButton"
+          >
+            ↑
+          </button>
 
-      <div class="composer-note">
-        O VÉRTEX pode cometer erros.
-        Confira informações importantes.
+        </div>
+
       </div>
 
     </div>
   `;
 
-  bindChatEvents();
+  renderWelcomeOrMessages();
 
-  renderMessages();
+  const input = document.getElementById("messageInput");
+  const send = document.getElementById("sendButton");
+  const plus = document.getElementById("plusButton");
+  const menu = document.getElementById("plusMenu");
+
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height =
+      Math.min(input.scrollHeight, 160) + "px";
+
+    send.disabled = !input.value.trim();
+  });
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+
+      if (input.value.trim()) {
+        sendMessage();
+      }
+    }
+  });
+
+  send.onclick = sendMessage;
+
+  plus.onclick = e => {
+    e.stopPropagation();
+    menu.classList.toggle("open");
+  };
+
+  document.querySelectorAll(".plus-option").forEach(btn => {
+    btn.onclick = () => {
+      menu.classList.remove("open");
+
+      currentPage = btn.dataset.action;
+      updateNav();
+      renderPage();
+    };
+  });
+
+  document.addEventListener("click", () => {
+    menu.classList.remove("open");
+  }, { once: true });
+
+  send.disabled = true;
 }
 
-/* =========================
-   EVENTOS DO CHAT
-========================= */
+function renderWelcomeOrMessages() {
+  const welcome = document.getElementById("welcome");
+  const messageBox = document.getElementById("messages");
 
-function bindChatEvents() {
+  if (!messages.length) {
+    welcome.style.display = "flex";
+    messageBox.style.display = "none";
 
-  const input =
-    document.getElementById(
-      "messageInput"
-    );
+    welcome.innerHTML = `
+      <div class="welcome-inner">
 
-  const send =
-    document.getElementById(
-      "sendBtn"
-    );
-
-  const plus =
-    document.getElementById(
-      "plusBtn"
-    );
-
-  const menu =
-    document.getElementById(
-      "plusMenu"
-    );
-
-  input.addEventListener(
-    "input",
-    () => {
-
-      input.style.height =
-        "auto";
-
-      input.style.height =
-        Math.min(
-          input.scrollHeight,
-          180
-        ) + "px";
-
-      send.disabled =
-        !input.value.trim();
-    }
-  );
-
-  input.addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
-      ) {
-
-        event.preventDefault();
-
-        if (!loading) {
-          sendMessage();
-        }
-
-      }
-
-    }
-  );
-
-  send.addEventListener(
-    "click",
-    sendMessage
-  );
-
-  plus.addEventListener(
-    "click",
-    event => {
-
-      event.stopPropagation();
-
-      menu.style.display =
-        menu.style.display === "none"
-          ? "block"
-          : "none";
-
-    }
-  );
-
-  menu
-    .querySelectorAll("button")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const action =
-            button.dataset.action;
-
-          menu.style.display =
-            "none";
-
-          navigateTo(action);
-        }
-      );
-
-    });
-
-  document.addEventListener(
-    "click",
-    event => {
-
-      if (
-        !menu.contains(
-          event.target
-        ) &&
-        event.target !== plus
-      ) {
-
-        menu.style.display =
-          "none";
-
-      }
-
-    }
-  );
-}
-
-/* =========================
-   MENSAGENS
-========================= */
-
-function renderMessages() {
-
-  const list =
-    document.getElementById(
-      "messageList"
-    );
-
-  if (!list) return;
-
-  if (
-    !currentChat ||
-    !Array.isArray(
-      currentChat.messages
-    ) ||
-    currentChat.messages.length === 0
-  ) {
-
-    list.innerHTML = `
-      <div class="welcome">
-
-        <div class="welcome-logo">
-          V
-        </div>
-
-        <h1>
-          Como posso ajudar?
-        </h1>
+        <h1>Como posso ajudar?</h1>
 
         <p>
-          Marketing digital, conteúdo,
-          anúncios e estratégias.
+          A VÉRTEX AI é sua assistente para marketing digital,
+          vendas e criação de estratégias.
         </p>
 
         <div class="suggestions">
 
-          ${suggestions
-            .map(
-              text => `
-                <button
-                  class="suggestion"
-                  data-suggestion="${escapeHTML(text)}"
-                >
-                  ${escapeHTML(text)}
-                </button>
-              `
-            )
-            .join("")}
+          <button
+            class="suggestion"
+            data-prompt="Quero começar do zero no marketing digital. Monte um plano simples para mim."
+          >
+            <div class="suggestion-title">
+              🚀 Começar do zero
+            </div>
+
+            <div class="suggestion-text">
+              Crie um plano para começar no digital.
+            </div>
+          </button>
+
+          <button
+            class="suggestion"
+            data-prompt="Crie um anúncio completo para um produto digital, com gancho, texto, título e CTA."
+          >
+            <div class="suggestion-title">
+              🎯 Criar anúncio
+            </div>
+
+            <div class="suggestion-text">
+              Crie um criativo pronto para testar.
+            </div>
+          </button>
+
+          <button
+            class="suggestion"
+            data-prompt="Crie uma estratégia com 7 posts para Instagram focados em marketing digital."
+          >
+            <div class="suggestion-title">
+              📱 Posts para Instagram
+            </div>
+
+            <div class="suggestion-text">
+              Tenha uma sequência de conteúdo.
+            </div>
+          </button>
+
+          <button
+            class="suggestion"
+            data-prompt="Crie uma estratégia completa para vender como afiliado usando conteúdo e anúncios."
+          >
+            <div class="suggestion-title">
+              💰 Estratégia de vendas
+            </div>
+
+            <div class="suggestion-text">
+              Estruture sua estratégia digital.
+            </div>
+          </button>
 
         </div>
 
       </div>
     `;
 
-    list
-      .querySelectorAll(
-        ".suggestion"
-      )
-      .forEach(button => {
+    document.querySelectorAll(".suggestion").forEach(btn => {
+      btn.onclick = () => {
+        document.getElementById("messageInput").value =
+          btn.dataset.prompt;
 
-        button.addEventListener(
-          "click",
-          () => {
+        document.getElementById("sendButton").disabled = false;
 
-            const input =
-              document.getElementById(
-                "messageInput"
-              );
-
-            input.value =
-              button.dataset.suggestion;
-
-            input.dispatchEvent(
-              new Event("input")
-            );
-
-            input.focus();
-          }
-        );
-
-      });
+        sendMessage();
+      };
+    });
 
     return;
   }
 
-  list.innerHTML =
-    currentChat.messages
-      .map(message => {
+  welcome.style.display = "none";
+  messageBox.style.display = "block";
 
-        const isUser =
-          message.role === "user";
+  messageBox.innerHTML = messages.map(message => {
 
-        return `
-          <div
-            class="message-row ${
-              isUser
-                ? "message-user"
-                : "message-vertex"
-            }"
-          >
+    if (message.role === "user") {
+      return `
+        <div class="message-row user">
 
-            ${
-              !isUser
-                ? `
-                  <div class="vertex-avatar">
+          <div class="message-wrap">
 
-                    <svg
-                      viewBox="0 0 40 40"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M7 7
-                           L15 7
-                           L20 22
-                           L26 7
-                           L34 7
-                           L25 33
-                           L17 33
-                           Z"
-                      ></path>
-                    </svg>
-
-                  </div>
-                `
-                : ""
-            }
-
-            <div class="message-bubble">
-
-              <div class="message-name">
-                ${
-                  isUser
-                    ? escapeHTML(
-                        user?.name ||
-                        "Você"
-                      )
-                    : "VÉRTEX AI"
-                }
-              </div>
-
-              <div class="message-text">
-                ${escapeHTML(
-                  message.content
-                )}
-              </div>
-
+            <div class="user-message-avatar">
+              ${initials(me?.name)}
             </div>
 
-            ${
-              isUser
-                ? `
-                  <div class="user-message-avatar">
-                    ${escapeHTML(
-                      initials(
-                        user?.name
-                      )
-                    )}
-                  </div>
-                `
-                : ""
-            }
+            <div class="message-bubble user-bubble">
+              ${escapeHtml(message.content)}
+            </div>
 
           </div>
-        `;
-      })
-      .join("");
 
-  const area =
-    document.getElementById(
-      "messagesArea"
-    );
+        </div>
+      `;
+    }
 
-  if (area) {
+    return `
+      <div class="message-row vertex">
 
-    setTimeout(() => {
-      area.scrollTop =
-        area.scrollHeight;
-    }, 0);
+        <div class="message-wrap">
 
-  }
+          ${vertexIcon("vertex-avatar")}
+
+          <div class="message-bubble vertex-bubble">
+            ${escapeHtml(message.content)}
+          </div>
+
+        </div>
+
+      </div>
+    `;
+  }).join("");
+
+  requestAnimationFrame(() => {
+    messageBox.scrollTop = messageBox.scrollHeight;
+  });
 }
-
-/* =========================
-   NOVA CONVERSA
-========================= */
-
-async function newChat() {
-
-  try {
-
-    const data =
-      await api(
-        "/api/chats",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            title:
-              "Nova conversa"
-          })
-        }
-      );
-
-    currentChat =
-      data.chat;
-
-    chats.unshift(
-      currentChat
-    );
-
-    renderChatHistory();
-
-    renderChatPage();
-
-  } catch (error) {
-
-    alert(error.message);
-
-  }
-}
-
-/* =========================
-   ABRIR CONVERSA
-========================= */
-
-async function openChat(id) {
-
-  try {
-
-    const data =
-      await api(
-        `/api/chats/${id}`
-      );
-
-    currentChat =
-      data.chat;
-
-    renderChatPage();
-
-  } catch (error) {
-
-    alert(error.message);
-
-  }
-}
-
-/* =========================
-   ENVIAR MENSAGEM
-========================= */
 
 async function sendMessage() {
-
-  if (loading) return;
-
-  const input =
-    document.getElementById(
-      "messageInput"
-    );
-
-  const send =
-    document.getElementById(
-      "sendBtn"
-    );
+  const input = document.getElementById("messageInput");
 
   if (!input) return;
 
-  const text =
-    input.value.trim();
+  const text = input.value.trim();
 
-  if (!text) return;
+  if (!text || !currentChatId) return;
 
-  loading = true;
+  const send = document.getElementById("sendButton");
 
   send.disabled = true;
+  input.disabled = true;
 
-  /* Cria conversa */
+  input.value = "";
 
-  if (!currentChat) {
-
-    try {
-
-      const data =
-        await api(
-          "/api/chats",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              title:
-                text.length > 35
-                  ? text.slice(0, 35) +
-                    "..."
-                  : text
-            })
-          }
-        );
-
-      currentChat =
-        data.chat;
-
-      chats.unshift(
-        currentChat
-      );
-
-      renderChatHistory();
-
-    } catch (error) {
-
-      loading = false;
-
-      send.disabled = false;
-
-      alert(error.message);
-
-      return;
-    }
-  }
-
-  if (
-    !Array.isArray(
-      currentChat.messages
-    )
-  ) {
-    currentChat.messages = [];
-  }
-
-  currentChat.messages.push({
+  messages.push({
     role: "user",
     content: text
   });
 
-  input.value = "";
-
-  input.style.height =
-    "auto";
-
-  renderMessages();
+  renderWelcomeOrMessages();
 
   try {
 
-    const data =
-      await api(
-        "/api/ai/generate",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            message: text,
-            history:
-              currentChat.messages
-                .slice(0, -1)
-          })
-        }
-      );
-
-    const answer =
-      data.answer ||
-      "Não consegui gerar uma resposta agora.";
-
-    currentChat.messages.push({
-      role: "assistant",
-      content: answer
+    await api(`/chats/${currentChatId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({
+        content: text
+      })
     });
 
-    await saveCurrentChat();
+    const result = await api("/ai/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        chatId: currentChatId,
+        prompt: text
+      })
+    });
 
-    renderMessages();
+    messages.push({
+      role: "assistant",
+      content: result.message
+    });
 
-  } catch (error) {
+    renderWelcomeOrMessages();
 
-    console.error(
-      "Erro na IA:",
-      error
-    );
+    await loadChats();
+    renderChatList();
 
-    currentChat.messages.push({
+  } catch (err) {
+
+    messages.push({
       role: "assistant",
       content:
-        "Não consegui responder agora. Tente novamente."
+        "⚠️ " + err.message
     });
 
-    renderMessages();
+    renderWelcomeOrMessages();
 
   } finally {
 
-    loading = false;
-
-    send.disabled =
-      !input.value.trim();
-
+    input.disabled = false;
     input.focus();
 
+    send.disabled = !input.value.trim();
   }
 }
 
-/* =========================
-   SALVAR CONVERSA
-========================= */
+async function newChat() {
+  const data = await api("/chats", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Nova conversa"
+    })
+  });
 
-async function saveCurrentChat() {
+  currentChatId = data.chat.id;
+  messages = [];
 
-  if (!currentChat) return;
+  await loadChats();
 
-  try {
+  currentPage = "chat";
 
-    await api(
-      `/api/chats/${currentChat.id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          title:
-            currentChat.title ||
-            "Nova conversa",
+  renderApp();
 
-          messages:
-            currentChat.messages
-        })
-      }
-    );
+  renderChatList();
 
-    const index =
-      chats.findIndex(
-        chat =>
-          chat.id ===
-          currentChat.id
-      );
-
-    if (index !== -1) {
-
-      chats[index] =
-        currentChat;
-
-    }
-
-    renderChatHistory();
-
-  } catch (error) {
-
-    console.error(
-      "Erro ao salvar conversa:",
-      error
-    );
-
-  }
+  document.getElementById("messageInput")?.focus();
 }
 
-/* =========================
-   NAVEGAÇÃO
-========================= */
+async function openChat(id) {
+  const data = await api(`/chats/${id}`);
 
-function navigateTo(page) {
+  currentChatId = data.chat.id;
+  messages = data.messages || [];
 
-  document
-    .querySelectorAll(
-      ".nav-item"
-    )
-    .forEach(item => {
+  currentPage = "chat";
 
-      item.classList.toggle(
-        "active",
-        item.dataset.page === page
-      );
+  updateNav();
+  renderPage();
+  renderChatList();
 
-    });
+  setTimeout(() => {
+    document.getElementById("messageInput")?.focus();
+  }, 100);
+}
 
-  if (page === "chat")
-    renderChatPage();
+function renderChatList() {
+  const list = document.getElementById("chatList");
 
-  if (page === "history")
-    renderHistoryPage();
+  if (!list) return;
 
-  if (page === "projects")
-    renderProjectsPage();
+  if (!chats.length) {
+    list.innerHTML = `
+      <div style="padding:10px;color:#888;font-size:12px">
+        Nenhuma conversa ainda.
+      </div>
+    `;
 
-  if (page === "plans")
-    renderPlansPage();
+    return;
+  }
 
-  if (page === "settings")
-    renderSettingsPage();
+  list.innerHTML = chats.map(chat => `
+    <div
+      class="chat-item ${chat.id === currentChatId ? "active" : ""}"
+      data-id="${chat.id}"
+    >
+      ${escapeHtml(chat.title)}
+    </div>
+  `).join("");
 
-  closeMobileSidebar();
+  list.querySelectorAll(".chat-item").forEach(item => {
+    item.onclick = () => {
+      openChat(Number(item.dataset.id));
+    };
+  });
 }
 
 /* =========================
    HISTÓRICO
 ========================= */
 
-function renderHistoryPage() {
+async function renderHistory() {
+  const content = document.getElementById("content");
 
-  const main =
-    document.getElementById(
-      "mainContent"
-    );
+  content.innerHTML = `
+    <div class="page">
+      <div class="page-inner">
+        <h1>Histórico</h1>
+        <p class="page-subtitle">
+          Todas as suas conversas ficam salvas aqui.
+        </p>
 
-  document.getElementById(
-    "topTitle"
-  ).textContent =
-    "Histórico";
-
-  main.className =
-    "page";
-
-  main.innerHTML = `
-    <div class="page-inner">
-
-      <h1>
-        Histórico
-      </h1>
-
-      <p class="page-subtitle">
-        Suas conversas anteriores
-        com o VÉRTEX AI.
-      </p>
-
-      ${
-        chats.length
-          ? `
-            <div class="card-grid">
-
-              ${chats
-                .map(
-                  chat => `
-                    <button
-                      class="card"
-                      data-history-id="${chat.id}"
-                    >
-
-                      <h3>
-                        ${escapeHTML(
-                          chat.title ||
-                          "Nova conversa"
-                        )}
-                      </h3>
-
-                      <p>
-                        ${
-                          chat.messages?.length ||
-                          0
-                        }
-                        mensagens
-                      </p>
-
-                    </button>
-                  `
-                )
-                .join("")}
-
-            </div>
-          `
-          : `
-            <div class="card">
-
-              <h3>
-                Nenhuma conversa
-              </h3>
-
-              <p>
-                Comece uma conversa
-                com o VÉRTEX AI.
-              </p>
-
-            </div>
-          `
-      }
-
+        <div id="historyList">
+          Carregando...
+        </div>
+      </div>
     </div>
   `;
 
-  main
-    .querySelectorAll(
-      "[data-history-id]"
-    )
-    .forEach(button => {
+  const data = await api("/history");
 
-      button.addEventListener(
-        "click",
-        async () => {
+  const list = document.getElementById("historyList");
 
-          await openChat(
-            Number(
-              button.dataset
-                .historyId
-            )
-          );
+  if (!data.history.length) {
+    list.innerHTML = `
+      <div class="history-card">
+        Nenhuma conversa no histórico.
+      </div>
+    `;
 
-        }
-      );
+    return;
+  }
 
-    });
+  list.innerHTML = data.history.map(item => `
+    <div class="history-card">
+
+      <strong>
+        ${escapeHtml(item.title)}
+      </strong>
+
+      <p style="color:#777">
+        ${item.message_count} mensagem(ns)
+      </p>
+
+      <button
+        class="secondary-button"
+        data-chat="${item.id}"
+      >
+        Abrir conversa
+      </button>
+
+    </div>
+  `).join("");
+
+  list.querySelectorAll("[data-chat]").forEach(btn => {
+    btn.onclick = async () => {
+      await openChat(Number(btn.dataset.chat));
+    };
+  });
 }
 
 /* =========================
    PROJETOS
 ========================= */
 
-function renderProjectsPage() {
+async function renderProjects() {
+  const content = document.getElementById("content");
 
-  const main =
-    document.getElementById(
-      "mainContent"
-    );
+  content.innerHTML = `
+    <div class="page">
+      <div class="page-inner">
 
-  document.getElementById(
-    "topTitle"
-  ).textContent =
-    "Projetos";
+        <h1>Projetos</h1>
 
-  main.className =
-    "page";
+        <p class="page-subtitle">
+          Organize seus projetos de marketing e vendas.
+        </p>
 
-  main.innerHTML = `
-    <div class="page-inner">
+        <div style="margin-top:20px">
 
-      <h1>
-        Projetos
-      </h1>
+          <input
+            id="projectTitle"
+            class="input"
+            placeholder="Nome do projeto"
+          >
 
-      <p class="page-subtitle">
-        Organize suas ideias,
-        campanhas e trabalhos.
+          <input
+            id="projectDescription"
+            class="input"
+            placeholder="Descrição do projeto"
+          >
+
+          <button
+            class="primary-button"
+            id="createProject"
+          >
+            + Criar projeto
+          </button>
+
+        </div>
+
+        <div id="projectsList" style="margin-top:25px">
+          Carregando...
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  document.getElementById("createProject").onclick =
+    createProject;
+
+  const data = await api("/projects");
+
+  renderProjectList(data.projects);
+}
+
+function renderProjectList(projects) {
+  const list = document.getElementById("projectsList");
+
+  if (!list) return;
+
+  if (!projects.length) {
+    list.innerHTML = `
+      <div class="project-card">
+        <strong>Nenhum projeto criado.</strong>
+        <p style="color:#777">
+          Crie seu primeiro projeto acima.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+  list.innerHTML = projects.map(project => `
+    <div class="project-card">
+
+      <h3>
+        ${escapeHtml(project.title)}
+      </h3>
+
+      <p>
+        ${escapeHtml(project.description || "Sem descrição")}
       </p>
 
-      <div class="card-grid">
+      <small>
+        Status: ${escapeHtml(project.status)}
+      </small>
 
-        <div class="card">
-          <h3>📣 Campanhas</h3>
-          <p>
-            Planeje anúncios e campanhas
-            de marketing.
-          </p>
-        </div>
+      <div class="project-actions">
 
-        <div class="card">
-          <h3>📱 Conteúdo</h3>
-          <p>
-            Organize ideias para Instagram
-            e outras redes.
-          </p>
-        </div>
-
-        <div class="card">
-          <h3>✍️ Copywriting</h3>
-          <p>
-            Crie textos, títulos,
-            chamadas e CTAs.
-          </p>
-        </div>
-
-        <div class="card">
-          <h3>💡 Ideias</h3>
-          <p>
-            Guarde novas ideias
-            para seus projetos.
-          </p>
-        </div>
+        <button
+          class="secondary-button"
+          data-delete="${project.id}"
+        >
+          Excluir
+        </button>
 
       </div>
 
     </div>
-  `;
+  `).join("");
+
+  list.querySelectorAll("[data-delete]").forEach(btn => {
+    btn.onclick = async () => {
+
+      if (!confirm("Excluir este projeto?")) {
+        return;
+      }
+
+      await api(`/projects/${btn.dataset.delete}`, {
+        method: "DELETE"
+      });
+
+      const data = await api("/projects");
+
+      renderProjectList(data.projects);
+    };
+  });
+}
+
+async function createProject() {
+  const title = document.getElementById("projectTitle").value.trim();
+  const description =
+    document.getElementById("projectDescription").value.trim();
+
+  if (!title) {
+    alert("Digite o nome do projeto.");
+    return;
+  }
+
+  await api("/projects", {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      description
+    })
+  });
+
+  document.getElementById("projectTitle").value = "";
+  document.getElementById("projectDescription").value = "";
+
+  const data = await api("/projects");
+
+  renderProjectList(data.projects);
 }
 
 /* =========================
    PLANOS
 ========================= */
 
-async function renderPlansPage() {
+async function renderPlans() {
+  const content = document.getElementById("content");
 
-  const main =
-    document.getElementById(
-      "mainContent"
-    );
+  content.innerHTML = `
+    <div class="page">
+      <div class="page-inner">
 
-  document.getElementById(
-    "topTitle"
-  ).textContent =
-    "Planos";
+        <h1>Planos</h1>
 
-  main.className =
-    "page";
+        <p class="page-subtitle">
+          Escolha o plano que combina com seu uso.
+        </p>
 
-  main.innerHTML = `
-    <div class="page-inner">
-
-      <h1>
-        Planos
-      </h1>
-
-      <p class="page-subtitle">
-        Escolha o plano que melhor
-        combina com você.
-      </p>
-
-      <div id="plansContainer">
-
-        <div class="card">
-          Carregando planos...
+        <div class="cards" id="plansCards">
+          Carregando...
         </div>
 
       </div>
-
     </div>
   `;
 
-  try {
+  const data = await api("/plans");
 
-    const data =
-      await api(
-        "/api/plans"
-      );
-
-    const plans =
-      data.plans || [];
-
-    document.getElementById(
-      "plansContainer"
-    ).innerHTML = `
-      <div class="card-grid">
-
-        ${plans
-          .map(
-            plan => `
-              <div class="plan-card">
-
-                <h2>
-                  ${escapeHTML(
-                    plan.name
-                  )}
-                </h2>
-
-                <div class="plan-price">
-
-                  ${
-                    Number(
-                      plan.price
-                    ) === 0
-                      ? "Grátis"
-                      : `R$ ${Number(
-                          plan.price
-                        )
-                          .toFixed(2)
-                          .replace(
-                            ".",
-                            ","
-                          )}`
-                  }
-
-                </div>
-
-                <p>
-                  ${escapeHTML(
-                    plan.description
-                  )}
-                </p>
-
-              </div>
-            `
-          )
-          .join("")}
-
-      </div>
-    `;
-
-  } catch {
-
-    document.getElementById(
-      "plansContainer"
-    ).innerHTML = `
+  document.getElementById("plansCards").innerHTML =
+    data.plans.map(plan => `
       <div class="card">
 
         <h3>
-          Não foi possível
-          carregar os planos.
+          ${escapeHtml(plan.name)}
         </h3>
 
+        <div style="font-size:25px;font-weight:800">
+          ${escapeHtml(plan.price)}
+        </div>
+
+        <p style="color:#777">
+          ${plan.credits} créditos de IA
+        </p>
+
+        <button class="primary-button">
+          Selecionar
+        </button>
+
       </div>
-    `;
-  }
+    `).join("");
 }
 
 /* =========================
    CONFIGURAÇÕES
 ========================= */
 
-function renderSettingsPage() {
+function renderSettings() {
+  const content = document.getElementById("content");
 
-  const main =
-    document.getElementById(
-      "mainContent"
-    );
+  content.innerHTML = `
+    <div class="page">
+      <div class="page-inner">
 
-  document.getElementById(
-    "topTitle"
-  ).textContent =
-    "Configurações";
+        <h1>Configurações</h1>
 
-  main.className =
-    "page";
+        <p class="page-subtitle">
+          Gerencie sua conta VÉRTEX.
+        </p>
 
-  main.innerHTML = `
-    <div class="page-inner">
+        <div class="card" style="margin-top:25px">
 
-      <h1>
-        Configurações
-      </h1>
+          <h3>Minha conta</h3>
 
-      <p class="page-subtitle">
-        Informações da sua conta VÉRTEX.
-      </p>
+          <p>
+            <strong>Nome:</strong>
+            ${escapeHtml(me?.name)}
+          </p>
 
-      <div class="card">
+          <p>
+            <strong>E-mail:</strong>
+            ${escapeHtml(me?.email)}
+          </p>
 
-        <div class="settings-row">
+          <p>
+            <strong>Plano:</strong>
+            ${escapeHtml(me?.plan)}
+          </p>
 
-          <div>
-
-            <strong>
-              Nome
-            </strong>
-
-            <p>
-              ${escapeHTML(
-                user?.name || "-"
-              )}
-            </p>
-
-          </div>
-
-        </div>
-
-        <div class="settings-row">
-
-          <div>
-
-            <strong>
-              E-mail
-            </strong>
-
-            <p>
-              ${escapeHTML(
-                user?.email || "-"
-              )}
-            </p>
-
-          </div>
-
-        </div>
-
-        <div class="settings-row">
-
-          <div>
-
-            <strong>
-              Plano
-            </strong>
-
-            <p>
-              ${escapeHTML(
-                user?.plan ||
-                "FREE"
-              )}
-            </p>
-
-          </div>
-
-        </div>
-
-        <div class="settings-row">
-
-          <div>
-
-            <strong>
-              Conta
-            </strong>
-
-            <p>
-              Sua conta está ativa.
-            </p>
-
-          </div>
+          <p>
+            <strong>Créditos:</strong>
+            ${escapeHtml(me?.credits)}
+          </p>
 
           <button
-            class="primary-btn"
-            id="settingsLogout"
+            class="secondary-button"
+            id="logout"
           >
-            Sair
+            Sair da conta
           </button>
 
         </div>
 
       </div>
-
     </div>
   `;
 
-  document
-    .getElementById(
-      "settingsLogout"
-    )
-    .addEventListener(
-      "click",
-      logout
-    );
+  document.getElementById("logout").onclick = () => {
+    token = null;
+    me = null;
+    chats = [];
+    messages = [];
+    currentChatId = null;
+
+    localStorage.removeItem("vertex_token");
+
+    renderLogin();
+  };
 }
 
 /* =========================
-   LOGOUT
-========================= */
-
-function logout() {
-
-  token = null;
-  user = null;
-  chats = [];
-  currentChat = null;
-
-  localStorage.removeItem(
-    "vertex_token"
-  );
-
-  showLogin(false);
-}
-
-/* =========================
-   INICIAR
+   START
 ========================= */
 
 if (token) {
   startApp();
 } else {
-  showLogin(false);
+  renderLogin();
 }
