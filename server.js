@@ -1,21 +1,15 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
+const Database = require("better-sqlite3");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const Database = require("better-sqlite3");
 
 const app = express();
+
 const PORT = process.env.PORT || 3000;
-
 const JWT_SECRET = process.env.JWT_SECRET || "vertex-secret-change-me";
-
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-// =====================================================
-// BANCO DE DADOS
-// =====================================================
 
 const dbDir = path.join(__dirname, "data");
 fs.mkdirSync(dbDir, { recursive: true });
@@ -25,44 +19,45 @@ const db = new Database(path.join(dbDir, "vertex.db"));
 db.pragma("journal_mode = WAL");
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    plan TEXT DEFAULT 'FREE',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  plan TEXT DEFAULT 'FREE',
+  credits INTEGER DEFAULT 30,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
-  CREATE TABLE IF NOT EXISTS chats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    title TEXT DEFAULT 'Nova conversa',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS chats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  title TEXT DEFAULT 'Nova conversa',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
-  CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  status TEXT DEFAULT 'Em andamento',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
 
-// =====================================================
-// FUNÇÕES AUXILIARES
-// =====================================================
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 function createToken(user) {
   return jwt.sign(
@@ -80,154 +75,106 @@ function auth(req, res, next) {
 
   if (!header.startsWith("Bearer ")) {
     return res.status(401).json({
-      error: "Não autorizado."
+      error: "Não autenticado"
     });
   }
 
-  const token = header.substring(7);
+  const token = header.slice(7);
 
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch {
     return res.status(401).json({
-      error: "Sessão expirada."
+      error: "Sessão expirada"
     });
   }
 }
 
-function cleanText(value, max = 12000) {
-  return String(value || "")
-    .trim()
-    .slice(0, max);
+function getUser(id) {
+  return db.prepare(`
+    SELECT id, name, email, plan, credits, created_at
+    FROM users
+    WHERE id = ?
+  `).get(id);
 }
 
-// =====================================================
-// HEALTH
-// =====================================================
+function cleanText(text) {
+  return String(text || "")
+    .replace(/\u0000/g, "")
+    .trim();
+}
 
 app.get("/health", (req, res) => {
   res.json({
     ok: true,
-    service: "VÉRTEX AI"
+    service: "VÉRTEX AI",
+    version: "5.0.0"
   });
 });
 
-// =====================================================
-// AUTENTICAÇÃO
-// =====================================================
+/* =========================
+   AUTH
+========================= */
 
-app.post("/api/auth/register", async (req, res) => {
-  try {
-    const name = cleanText(req.body.name, 80);
-    const email = cleanText(req.body.email, 160).toLowerCase();
-    const password = String(req.body.password || "");
+app.post("/api/auth/register", (req, res) => {
+  const name = cleanText(req.body.name);
+  const email = cleanText(req.body.email).toLowerCase();
+  const password = String(req.body.password || "");
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        error: "Preencha todos os campos."
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        error: "A senha precisa ter pelo menos 6 caracteres."
-      });
-    }
-
-    const exists = db
-      .prepare("SELECT id FROM users WHERE email = ?")
-      .get(email);
-
-    if (exists) {
-      return res.status(409).json({
-        error: "Este e-mail já está cadastrado."
-      });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-
-    const result = db
-      .prepare(`
-        INSERT INTO users (name, email, password)
-        VALUES (?, ?, ?)
-      `)
-      .run(name, email, hash);
-
-    const user = db
-      .prepare(`
-        SELECT id, name, email, plan
-        FROM users
-        WHERE id = ?
-      `)
-      .get(result.lastInsertRowid);
-
-    res.json({
-      token: createToken(user),
-      user
-    });
-  } catch (error) {
-    console.error("REGISTER:", error);
-
-    res.status(500).json({
-      error: "Não foi possível criar a conta."
+  if (!name || !email || password.length < 6) {
+    return res.status(400).json({
+      error: "Preencha nome, e-mail e uma senha com pelo menos 6 caracteres."
     });
   }
-});
 
-app.post("/api/auth/login", async (req, res) => {
-  try {
-    const email = cleanText(req.body.email, 160).toLowerCase();
-    const password = String(req.body.password || "");
+  const exists = db.prepare(`
+    SELECT id FROM users WHERE email = ?
+  `).get(email);
 
-    const user = db
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get(email);
-
-    if (!user) {
-      return res.status(401).json({
-        error: "E-mail ou senha incorretos."
-      });
-    }
-
-    const valid = await bcrypt.compare(password, user.password);
-
-    if (!valid) {
-      return res.status(401).json({
-        error: "E-mail ou senha incorretos."
-      });
-    }
-
-    res.json({
-      token: createToken(user),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        plan: user.plan
-      }
-    });
-  } catch (error) {
-    console.error("LOGIN:", error);
-
-    res.status(500).json({
-      error: "Erro ao entrar."
+  if (exists) {
+    return res.status(409).json({
+      error: "Este e-mail já está cadastrado."
     });
   }
+
+  const hash = bcrypt.hashSync(password, 10);
+
+  const result = db.prepare(`
+    INSERT INTO users (name, email, password)
+    VALUES (?, ?, ?)
+  `).run(name, email, hash);
+
+  const user = getUser(result.lastInsertRowid);
+
+  res.json({
+    token: createToken(user),
+    user
+  });
 });
 
-// =====================================================
-// USUÁRIO
-// =====================================================
+app.post("/api/auth/login", (req, res) => {
+  const email = cleanText(req.body.email).toLowerCase();
+  const password = String(req.body.password || "");
+
+  const user = db.prepare(`
+    SELECT * FROM users WHERE email = ?
+  `).get(email);
+
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(401).json({
+      error: "E-mail ou senha incorretos."
+    });
+  }
+
+  res.json({
+    token: createToken(user),
+    user: getUser(user.id)
+  });
+});
 
 app.get("/api/me", auth, (req, res) => {
-  const user = db
-    .prepare(`
-      SELECT id, name, email, plan, created_at
-      FROM users
-      WHERE id = ?
-    `)
-    .get(req.user.id);
+  const user = getUser(req.user.id);
 
   if (!user) {
     return res.status(404).json({
@@ -235,69 +182,56 @@ app.get("/api/me", auth, (req, res) => {
     });
   }
 
-  res.json({
-    user
-  });
+  res.json({ user });
 });
 
-// =====================================================
-// CHATS
-// =====================================================
+/* =========================
+   CHATS
+========================= */
 
 app.get("/api/chats", auth, (req, res) => {
-  const chats = db
-    .prepare(`
-      SELECT
-        id,
-        title,
-        created_at,
-        updated_at
-      FROM chats
-      WHERE user_id = ?
-      ORDER BY updated_at DESC
-    `)
-    .all(req.user.id);
+  const chats = db.prepare(`
+    SELECT
+      c.id,
+      c.title,
+      c.created_at,
+      c.updated_at,
+      (
+        SELECT content
+        FROM messages m
+        WHERE m.chat_id = c.id
+        ORDER BY m.id DESC
+        LIMIT 1
+      ) AS last_message
+    FROM chats c
+    WHERE c.user_id = ?
+    ORDER BY c.updated_at DESC
+  `).all(req.user.id);
 
-  res.json({
-    chats
-  });
+  res.json({ chats });
 });
 
 app.post("/api/chats", auth, (req, res) => {
-  const title =
-    cleanText(req.body.title, 120) || "Nova conversa";
+  const title = cleanText(req.body.title) || "Nova conversa";
 
-  const result = db
-    .prepare(`
-      INSERT INTO chats (user_id, title)
-      VALUES (?, ?)
-    `)
-    .run(req.user.id, title);
+  const result = db.prepare(`
+    INSERT INTO chats (user_id, title)
+    VALUES (?, ?)
+  `).run(req.user.id, title);
 
-  const chat = db
-    .prepare(`
-      SELECT *
-      FROM chats
-      WHERE id = ?
-    `)
-    .get(result.lastInsertRowid);
+  const chat = db.prepare(`
+    SELECT * FROM chats WHERE id = ?
+  `).get(result.lastInsertRowid);
 
-  res.json({
-    chat
-  });
+  res.json({ chat });
 });
 
 app.get("/api/chats/:id", auth, (req, res) => {
-  const chatId = Number(req.params.id);
-
-  const chat = db
-    .prepare(`
-      SELECT *
-      FROM chats
-      WHERE id = ?
-      AND user_id = ?
-    `)
-    .get(chatId, req.user.id);
+  const chat = db.prepare(`
+    SELECT *
+    FROM chats
+    WHERE id = ? AND user_id = ?
+  `).get(req.params.id, req.user.id);
 
   if (!chat) {
     return res.status(404).json({
@@ -305,14 +239,12 @@ app.get("/api/chats/:id", auth, (req, res) => {
     });
   }
 
-  const messages = db
-    .prepare(`
-      SELECT id, role, content, created_at
-      FROM messages
-      WHERE chat_id = ?
-      ORDER BY id ASC
-    `)
-    .all(chatId);
+  const messages = db.prepare(`
+    SELECT id, role, content, created_at
+    FROM messages
+    WHERE chat_id = ?
+    ORDER BY id ASC
+  `).all(chat.id);
 
   res.json({
     chat,
@@ -321,16 +253,10 @@ app.get("/api/chats/:id", auth, (req, res) => {
 });
 
 app.delete("/api/chats/:id", auth, (req, res) => {
-  const chatId = Number(req.params.id);
-
-  const chat = db
-    .prepare(`
-      SELECT id
-      FROM chats
-      WHERE id = ?
-      AND user_id = ?
-    `)
-    .get(chatId, req.user.id);
+  const chat = db.prepare(`
+    SELECT id FROM chats
+    WHERE id = ? AND user_id = ?
+  `).get(req.params.id, req.user.id);
 
   if (!chat) {
     return res.status(404).json({
@@ -338,288 +264,178 @@ app.delete("/api/chats/:id", auth, (req, res) => {
     });
   }
 
-  db.prepare("DELETE FROM messages WHERE chat_id = ?")
-    .run(chatId);
+  db.prepare(`
+    DELETE FROM messages WHERE chat_id = ?
+  `).run(chat.id);
 
-  db.prepare("DELETE FROM chats WHERE id = ?")
-    .run(chatId);
+  db.prepare(`
+    DELETE FROM chats WHERE id = ?
+  `).run(chat.id);
 
-  res.json({
-    ok: true
-  });
+  res.json({ ok: true });
 });
 
-// =====================================================
-// HISTÓRICO
-// =====================================================
+/* =========================
+   HISTÓRICO
+========================= */
 
 app.get("/api/history", auth, (req, res) => {
-  const history = db
-    .prepare(`
-      SELECT
-        c.id,
-        c.title,
-        c.created_at,
-        c.updated_at,
-        (
-          SELECT COUNT(*)
-          FROM messages m
-          WHERE m.chat_id = c.id
-        ) AS message_count
-      FROM chats c
-      WHERE c.user_id = ?
-      ORDER BY c.updated_at DESC
-    `)
-    .all(req.user.id);
+  const history = db.prepare(`
+    SELECT
+      c.id,
+      c.title,
+      c.created_at,
+      c.updated_at,
+      (
+        SELECT COUNT(*)
+        FROM messages m
+        WHERE m.chat_id = c.id
+      ) AS message_count
+    FROM chats c
+    WHERE c.user_id = ?
+    ORDER BY c.updated_at DESC
+  `).all(req.user.id);
 
-  res.json({
-    history
-  });
+  res.json({ history });
 });
 
-// =====================================================
-// PROJETOS
-// =====================================================
+/* =========================
+   MENSAGENS
+========================= */
 
-app.get("/api/projects", auth, (req, res) => {
-  const projects = db
-    .prepare(`
-      SELECT *
-      FROM projects
-      WHERE user_id = ?
-      ORDER BY updated_at DESC
-    `)
-    .all(req.user.id);
+app.post("/api/chats/:id/messages", auth, (req, res) => {
+  const chat = db.prepare(`
+    SELECT id
+    FROM chats
+    WHERE id = ? AND user_id = ?
+  `).get(req.params.id, req.user.id);
 
-  res.json({
-    projects
-  });
-});
-
-app.post("/api/projects", auth, (req, res) => {
-  const name = cleanText(req.body.name, 120);
-  const description = cleanText(req.body.description, 1000);
-
-  if (!name) {
-    return res.status(400).json({
-      error: "Digite um nome para o projeto."
-    });
-  }
-
-  const result = db
-    .prepare(`
-      INSERT INTO projects
-      (user_id, name, description)
-      VALUES (?, ?, ?)
-    `)
-    .run(
-      req.user.id,
-      name,
-      description
-    );
-
-  const project = db
-    .prepare(`
-      SELECT *
-      FROM projects
-      WHERE id = ?
-    `)
-    .get(result.lastInsertRowid);
-
-  res.json({
-    project
-  });
-});
-
-app.delete("/api/projects/:id", auth, (req, res) => {
-  const id = Number(req.params.id);
-
-  const result = db
-    .prepare(`
-      DELETE FROM projects
-      WHERE id = ?
-      AND user_id = ?
-    `)
-    .run(id, req.user.id);
-
-  if (!result.changes) {
+  if (!chat) {
     return res.status(404).json({
-      error: "Projeto não encontrado."
+      error: "Conversa não encontrada."
     });
   }
+
+  const content = cleanText(req.body.content);
+
+  if (!content) {
+    return res.status(400).json({
+      error: "Mensagem vazia."
+    });
+  }
+
+  db.prepare(`
+    INSERT INTO messages (chat_id, role, content)
+    VALUES (?, 'user', ?)
+  `).run(chat.id, content);
+
+  db.prepare(`
+    UPDATE chats
+    SET
+      title = CASE
+        WHEN title = 'Nova conversa' THEN ?
+        ELSE title
+      END,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(
+    content.length > 45
+      ? content.slice(0, 45) + "..."
+      : content,
+    chat.id
+  );
 
   res.json({
     ok: true
   });
 });
 
-// =====================================================
-// IA VÉRTEX
-// =====================================================
+/* =========================
+   IA
+========================= */
 
-const VERTEX_SYSTEM_PROMPT = `
-Você é o VÉRTEX AI.
-
-Você é um assistente digital especializado em:
-- marketing digital;
-- renda extra;
-- vendas online;
-- criação de conteúdo;
-- copywriting;
-- anúncios;
-- Instagram;
-- estratégias de aquisição;
-- criação de ofertas;
-- páginas de vendas;
-- roteiros para vídeos;
-- ideias de produtos digitais;
-- organização de projetos.
-
-PERSONALIDADE:
-- Seja inteligente, direto e estratégico.
-- Fale em português do Brasil.
-- Explique de forma simples quando o usuário estiver começando.
-- Quando o usuário pedir algo prático, entregue algo pronto para usar.
-- Não fique repetindo que você é uma IA.
-- Não invente resultados, números ou experiências pessoais.
-- Não prometa dinheiro fácil ou ganhos garantidos.
-- Quando uma estratégia tiver riscos ou depender de testes, deixe isso claro.
-
-COMO RESPONDER:
-1. Entenda primeiro o objetivo do usuário.
-2. Dê uma resposta prática.
-3. Quando fizer sentido, organize em etapas.
-4. Use exemplos.
-5. Se o usuário pedir uma copy, entregue a copy pronta.
-6. Se pedir um anúncio, entregue gancho, texto, título e CTA.
-7. Se pedir estratégia, explique o caminho passo a passo.
-8. Se o usuário estiver perdido, ajude a escolher o próximo passo.
-9. Não faça perguntas desnecessárias quando já houver informação suficiente.
-
-O objetivo do VÉRTEX é ajudar o usuário a transformar ideias em ações concretas no digital.
-`;
-
-// =====================================================
-// CHAMADA PARA API DE IA
-// =====================================================
-
-async function callAI(messages) {
+async function generateAI(messages) {
   const apiKey = process.env.AI_API_KEY;
+  const apiUrl = process.env.AI_API_URL || "https://api.openai.com/v1/responses";
+  const model = process.env.AI_MODEL || "gpt-5.6-luna";
 
   if (!apiKey) {
     return {
       demo: true,
       text:
-        "O VÉRTEX está funcionando, mas a chave da IA ainda não foi configurada no Railway. Adicione a variável AI_API_KEY para ativar as respostas da IA."
+        "A VÉRTEX está pronta. Para ativar a resposta real da IA, configure a variável AI_API_KEY no Railway."
     };
   }
-
-  const apiUrl =
-    process.env.AI_API_URL ||
-    "https://api.openai.com/v1/responses";
-
-  const model =
-    process.env.AI_MODEL ||
-    "gpt-5.6-luna";
 
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
+      Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model,
-      input: messages,
-      temperature: 0.7,
-      max_output_tokens: 1800
+      input: messages.map(m => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content
+      }))
     })
   });
 
-  const raw = await response.text();
-
   if (!response.ok) {
-    console.error("AI STATUS:", response.status);
-    console.error("AI RESPONSE:", raw);
+    const errorText = await response.text();
 
-    throw new Error(
-      `Falha na API de IA: ${response.status}`
-    );
+    console.error("AI ERROR:", response.status, errorText);
+
+    throw new Error("Falha no provedor de IA.");
   }
 
-  let data;
+  const data = await response.json();
 
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error("Resposta inválida da API de IA.");
+  let text = "";
+
+  if (typeof data.output_text === "string") {
+    text = data.output_text;
   }
 
-  // Formato Responses API
-  if (data.output_text) {
-    return {
-      demo: false,
-      text: data.output_text
-    };
-  }
-
-  // Fallback caso a API retorne blocos de output
-  if (Array.isArray(data.output)) {
-    const parts = [];
-
+  if (!text && Array.isArray(data.output)) {
     for (const item of data.output) {
-      if (!Array.isArray(item.content)) continue;
-
-      for (const content of item.content) {
-        if (
-          content.type === "output_text" &&
-          content.text
-        ) {
-          parts.push(content.text);
+      if (Array.isArray(item.content)) {
+        for (const part of item.content) {
+          if (typeof part.text === "string") {
+            text += part.text;
+          }
         }
       }
     }
-
-    if (parts.length) {
-      return {
-        demo: false,
-        text: parts.join("\n")
-      };
-    }
   }
 
-  throw new Error(
-    "A IA respondeu, mas não foi possível encontrar o texto."
-  );
-}
+  if (!text) {
+    text = "Não consegui gerar uma resposta agora.";
+  }
 
-// =====================================================
-// GERAR RESPOSTA
-// =====================================================
+  return {
+    demo: false,
+    text: text.trim()
+  };
+}
 
 app.post("/api/ai/generate", auth, async (req, res) => {
   try {
-    const chatId = Number(req.body.chat_id);
-    const userMessage = cleanText(
-      req.body.message,
-      12000
-    );
+    const chatId = Number(req.body.chatId);
+    const prompt = cleanText(req.body.prompt);
 
-    if (!chatId || !userMessage) {
+    if (!chatId || !prompt) {
       return res.status(400).json({
-        error: "Mensagem inválida."
+        error: "Chat ou mensagem inválida."
       });
     }
 
-    // Verifica se o chat pertence ao usuário
-    const chat = db
-      .prepare(`
-        SELECT *
-        FROM chats
-        WHERE id = ?
-        AND user_id = ?
-      `)
-      .get(chatId, req.user.id);
+    const chat = db.prepare(`
+      SELECT id
+      FROM chats
+      WHERE id = ? AND user_id = ?
+    `).get(chatId, req.user.id);
 
     if (!chat) {
       return res.status(404).json({
@@ -627,77 +443,34 @@ app.post("/api/ai/generate", auth, async (req, res) => {
       });
     }
 
-    // Salva mensagem do usuário
-    db.prepare(`
-      INSERT INTO messages
-      (chat_id, role, content)
-      VALUES (?, 'user', ?)
-    `).run(chatId, userMessage);
-
-    // Atualiza título automaticamente na primeira mensagem
-    const messageCount = db
-      .prepare(`
-        SELECT COUNT(*) AS total
-        FROM messages
-        WHERE chat_id = ?
-      `)
-      .get(chatId);
-
-    if (messageCount.total === 1) {
-      const title =
-        userMessage.length > 55
-          ? userMessage.substring(0, 55) + "..."
-          : userMessage;
-
-      db.prepare(`
-        UPDATE chats
-        SET title = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(title, chatId);
-    }
-
-    // Pega contexto da conversa
-    const history = db
-      .prepare(`
-        SELECT role, content
-        FROM messages
-        WHERE chat_id = ?
-        ORDER BY id DESC
-        LIMIT 20
-      `)
-      .all(chatId)
-      .reverse();
+    const history = db.prepare(`
+      SELECT role, content
+      FROM messages
+      WHERE chat_id = ?
+      ORDER BY id ASC
+      LIMIT 30
+    `).all(chatId);
 
     const aiMessages = [
       {
-        role: "system",
-        content: VERTEX_SYSTEM_PROMPT
+        role: "user",
+        content:
+          "Você é a VÉRTEX AI, uma assistente profissional especializada em marketing digital, criação de conteúdo, vendas online, afiliados, copywriting, anúncios, funis, estratégias digitais e ideias legítimas para geração de renda. Responda em português do Brasil, de forma prática, clara e profissional."
       },
-      ...history.map(message => ({
-        role:
-          message.role === "assistant"
-            ? "assistant"
-            : "user",
-        content: message.content
-      }))
+      ...history,
+      {
+        role: "user",
+        content: prompt
+      }
     ];
 
-    // Chama a IA
-    const result = await callAI(aiMessages);
+    const result = await generateAI(aiMessages);
 
-    const assistantText = cleanText(
-      result.text,
-      16000
-    );
-
-    // Salva resposta
     db.prepare(`
-      INSERT INTO messages
-      (chat_id, role, content)
+      INSERT INTO messages (chat_id, role, content)
       VALUES (?, 'assistant', ?)
-    `).run(chatId, assistantText);
+    `).run(chatId, result.text);
 
-    // Atualiza conversa
     db.prepare(`
       UPDATE chats
       SET updated_at = CURRENT_TIMESTAMP
@@ -706,22 +479,120 @@ app.post("/api/ai/generate", auth, async (req, res) => {
 
     res.json({
       ok: true,
-      message: assistantText,
-      demo: result.demo || false
+      message: result.text,
+      demo: result.demo
     });
   } catch (error) {
-    console.error("VÉRTEX AI ERROR:", error);
+    console.error(error);
 
     res.status(500).json({
-      error:
-        "O VÉRTEX encontrou um problema ao gerar a resposta."
+      error: "A IA não conseguiu responder agora."
     });
   }
 });
 
-// =====================================================
-// PLANOS
-// =====================================================
+/* =========================
+   PROJETOS
+========================= */
+
+app.get("/api/projects", auth, (req, res) => {
+  const projects = db.prepare(`
+    SELECT *
+    FROM projects
+    WHERE user_id = ?
+    ORDER BY updated_at DESC
+  `).all(req.user.id);
+
+  res.json({ projects });
+});
+
+app.post("/api/projects", auth, (req, res) => {
+  const title = cleanText(req.body.title);
+  const description = cleanText(req.body.description);
+
+  if (!title) {
+    return res.status(400).json({
+      error: "Informe um nome para o projeto."
+    });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO projects (user_id, title, description)
+    VALUES (?, ?, ?)
+  `).run(
+    req.user.id,
+    title,
+    description
+  );
+
+  const project = db.prepare(`
+    SELECT *
+    FROM projects
+    WHERE id = ?
+  `).get(result.lastInsertRowid);
+
+  res.json({ project });
+});
+
+app.put("/api/projects/:id", auth, (req, res) => {
+  const project = db.prepare(`
+    SELECT id
+    FROM projects
+    WHERE id = ? AND user_id = ?
+  `).get(req.params.id, req.user.id);
+
+  if (!project) {
+    return res.status(404).json({
+      error: "Projeto não encontrado."
+    });
+  }
+
+  const title = cleanText(req.body.title);
+  const description = cleanText(req.body.description);
+  const status = cleanText(req.body.status) || "Em andamento";
+
+  db.prepare(`
+    UPDATE projects
+    SET
+      title = ?,
+      description = ?,
+      status = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(
+    title,
+    description,
+    status,
+    project.id
+  );
+
+  res.json({
+    project: db.prepare(`
+      SELECT *
+      FROM projects
+      WHERE id = ?
+    `).get(project.id)
+  });
+});
+
+app.delete("/api/projects/:id", auth, (req, res) => {
+  const result = db.prepare(`
+    DELETE FROM projects
+    WHERE id = ? AND user_id = ?
+  `).run(req.params.id, req.user.id);
+
+  if (!result.changes) {
+    return res.status(404).json({
+      error: "Projeto não encontrado."
+    });
+  }
+
+  res.json({ ok: true });
+});
+
+/* =========================
+   PLANOS
+========================= */
 
 app.get("/api/plans", (req, res) => {
   res.json({
@@ -729,45 +600,35 @@ app.get("/api/plans", (req, res) => {
       {
         id: "FREE",
         name: "Grátis",
-        price: 0,
-        description: "Para começar"
+        price: "R$ 0",
+        credits: 30
       },
       {
         id: "PRO",
-        name: "VÉRTEX PRO",
-        price: 29.90,
-        description: "Mais recursos e utilização"
+        name: "PRO",
+        price: "R$ 29,90",
+        credits: 500
       },
       {
         id: "PRO_ANNUAL",
-        name: "VÉRTEX PRO Anual",
-        price: 299.90,
-        description: "Plano anual"
+        name: "PRO Anual",
+        price: "R$ 299,90",
+        credits: 8000
       }
     ]
   });
 });
 
-// =====================================================
-// ARQUIVOS DO SITE
-// =====================================================
+/* =========================
+   STATIC
+========================= */
 
-const publicDir = path.join(__dirname, "public");
-
-app.use(express.static(publicDir));
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/{*splat}", (req, res) => {
-  res.sendFile(
-    path.join(publicDir, "index.html")
-  );
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// =====================================================
-// INICIAR
-// =====================================================
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `VÉRTEX AI rodando na porta ${PORT}`
-  );
+app.listen(PORT, () => {
+  console.log(`VÉRTEX AI rodando na porta ${PORT}`);
 });
