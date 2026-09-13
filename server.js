@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS projects (
   user_id INTEGER NOT NULL,
   title TEXT NOT NULL,
   description TEXT DEFAULT '',
-  status TEXT DEFAULT 'Em andamento',
+  status TEXT DEFAULT 'Ativo',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -356,8 +356,13 @@ app.post("/api/chats/:id/messages", auth, (req, res) => {
 
 async function generateAI(messages) {
   const apiKey = process.env.AI_API_KEY;
-  const apiUrl = process.env.AI_API_URL || "https://api.openai.com/v1/responses";
-  const model = process.env.AI_MODEL || "gpt-5.6-luna";
+  const apiUrl =
+    process.env.AI_API_URL ||
+    "https://api.openai.com/v1/responses";
+
+  const model =
+    process.env.AI_MODEL ||
+    "gpt-5.6-luna";
 
   if (!apiKey) {
     return {
@@ -376,7 +381,9 @@ async function generateAI(messages) {
     body: JSON.stringify({
       model,
       input: messages.map(m => ({
-        role: m.role === "assistant" ? "assistant" : "user",
+        role: m.role === "assistant"
+          ? "assistant"
+          : "user",
         content: m.content
       }))
     })
@@ -385,9 +392,15 @@ async function generateAI(messages) {
   if (!response.ok) {
     const errorText = await response.text();
 
-    console.error("AI ERROR:", response.status, errorText);
+    console.error(
+      "AI ERROR:",
+      response.status,
+      errorText
+    );
 
-    throw new Error("Falha no provedor de IA.");
+    throw new Error(
+      "Falha no provedor de IA."
+    );
   }
 
   const data = await response.json();
@@ -411,7 +424,8 @@ async function generateAI(messages) {
   }
 
   if (!text) {
-    text = "Não consegui gerar uma resposta agora.";
+    text =
+      "Não consegui gerar uma resposta agora.";
   }
 
   return {
@@ -464,12 +478,17 @@ app.post("/api/ai/generate", auth, async (req, res) => {
       }
     ];
 
-    const result = await generateAI(aiMessages);
+    const result = await generateAI(
+      aiMessages
+    );
 
     db.prepare(`
       INSERT INTO messages (chat_id, role, content)
       VALUES (?, 'assistant', ?)
-    `).run(chatId, result.text);
+    `).run(
+      chatId,
+      result.text
+    );
 
     db.prepare(`
       UPDATE chats
@@ -482,11 +501,13 @@ app.post("/api/ai/generate", auth, async (req, res) => {
       message: result.text,
       demo: result.demo
     });
+
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
-      error: "A IA não conseguiu responder agora."
+      error:
+        "A IA não conseguiu responder agora."
     });
   }
 });
@@ -508,21 +529,29 @@ app.get("/api/projects", auth, (req, res) => {
 
 app.post("/api/projects", auth, (req, res) => {
   const title = cleanText(req.body.title);
-  const description = cleanText(req.body.description);
+  const description =
+    cleanText(req.body.description);
 
   if (!title) {
     return res.status(400).json({
-      error: "Informe um nome para o projeto."
+      error:
+        "Informe um nome para o projeto."
     });
   }
 
   const result = db.prepare(`
-    INSERT INTO projects (user_id, title, description)
-    VALUES (?, ?, ?)
+    INSERT INTO projects (
+      user_id,
+      title,
+      description,
+      status
+    )
+    VALUES (?, ?, ?, ?)
   `).run(
     req.user.id,
     title,
-    description
+    description,
+    "Ativo"
   );
 
   const project = db.prepare(`
@@ -539,17 +568,25 @@ app.put("/api/projects/:id", auth, (req, res) => {
     SELECT id
     FROM projects
     WHERE id = ? AND user_id = ?
-  `).get(req.params.id, req.user.id);
+  `).get(
+    req.params.id,
+    req.user.id
+  );
 
   if (!project) {
     return res.status(404).json({
-      error: "Projeto não encontrado."
+      error:
+        "Projeto não encontrado."
     });
   }
 
   const title = cleanText(req.body.title);
-  const description = cleanText(req.body.description);
-  const status = cleanText(req.body.status) || "Em andamento";
+  const description =
+    cleanText(req.body.description);
+
+  const status =
+    cleanText(req.body.status) ||
+    "Em andamento";
 
   db.prepare(`
     UPDATE projects
@@ -579,15 +616,21 @@ app.delete("/api/projects/:id", auth, (req, res) => {
   const result = db.prepare(`
     DELETE FROM projects
     WHERE id = ? AND user_id = ?
-  `).run(req.params.id, req.user.id);
+  `).run(
+    req.params.id,
+    req.user.id
+  );
 
   if (!result.changes) {
     return res.status(404).json({
-      error: "Projeto não encontrado."
+      error:
+        "Projeto não encontrado."
     });
   }
 
-  res.json({ ok: true });
+  res.json({
+    ok: true
+  });
 });
 
 /* =========================
@@ -623,12 +666,24 @@ app.get("/api/plans", (req, res) => {
    STATIC
 ========================= */
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  express.static(
+    path.join(__dirname, "public")
+  )
+);
 
 app.get("/{*splat}", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
+  );
 });
 
 app.listen(PORT, () => {
-  console.log(`VÉRTEX AI rodando na porta ${PORT}`);
+  console.log(
+    `VÉRTEX AI rodando na porta ${PORT}`
+  );
 });
