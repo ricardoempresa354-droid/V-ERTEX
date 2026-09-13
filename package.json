@@ -1,7 +1,7 @@
 {
   "name": "vertex-ai",
-  "version": "1.0.0",
-  "description": "VÉRTEX AI - Assistente de marketing digital",
+  "version": "5.0.0",
+  "description": "VÉRTEX AI - Assistente de renda extra e marketing digital",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,8 +10,9 @@
     "node": ">=24 <27"
   },
   "dependencies": {
+    "@huggingface/inference": "^4.13.0",
     "bcryptjs": "^3.0.2",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^12.4.1",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2"
   }
