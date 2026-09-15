@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
 
@@ -8,18 +9,328 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <meta name="theme-color" content="#ffffff">
+  <meta
+    name="theme-color"
+    content="#ffffff"
+  >
 
   <title>VÉRTEX AI</title>
 
-  <link rel="stylesheet" href="/style.css">
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
 </head>
 
 <body>
 
-  <div id="app"></div>
+  <!-- =========================
+       LOGIN / CADASTRO
+  ========================== -->
+
+  <section
+    id="auth"
+    class="auth"
+  >
+
+    <div class="auth-card">
+
+      <div class="auth-logo">
+        V
+      </div>
+
+      <h1>
+        VÉRTEX AI
+      </h1>
+
+      <p class="muted">
+        Seu assistente para renda extra no digital.
+      </p>
+
+      <div class="auth-tabs">
+
+        <button
+          id="loginTab"
+          class="auth-tab on"
+          type="button"
+          onclick="authMode('login')"
+        >
+          Entrar
+        </button>
+
+        <button
+          id="registerTab"
+          class="auth-tab"
+          type="button"
+          onclick="authMode('register')"
+        >
+          Criar conta
+        </button>
+
+      </div>
+
+      <div
+        id="authError"
+        class="error"
+      ></div>
+
+      <div id="authForm"></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =========================
+       APLICAÇÃO
+  ========================== -->
+
+  <div
+    id="app"
+    class="app hidden"
+  >
+
+    <!-- SIDEBAR -->
+
+    <aside class="side">
+
+      <div class="brand">
+
+        <div class="brand-mark">
+          V
+        </div>
+
+        <div>
+          <strong>
+            VÉRTEX AI
+          </strong>
+
+          <span>
+            Renda extra
+          </span>
+        </div>
+
+      </div>
+
+
+      <nav>
+
+        <button
+          data-view="dashboard"
+          type="button"
+        >
+          🏠
+          <span>
+            Dashboard
+          </span>
+        </button>
+
+        <button
+          data-view="workspace"
+          type="button"
+        >
+          ✦
+          <span>
+            VÉRTEX IA
+          </span>
+        </button>
+
+        <button
+          data-view="templates"
+          type="button"
+        >
+          🧰
+          <span>
+            Ferramentas
+          </span>
+        </button>
+
+        <button
+          data-view="bonuses"
+          type="button"
+        >
+          🎁
+          <span>
+            Bônus
+          </span>
+        </button>
+
+        <button
+          data-view="projects"
+          type="button"
+        >
+          📁
+          <span>
+            Projetos
+          </span>
+        </button>
+
+        <button
+          data-view="history"
+          type="button"
+        >
+          🕘
+          <span>
+            Histórico
+          </span>
+        </button>
+
+        <button
+          data-view="plans"
+          type="button"
+        >
+          💳
+          <span>
+            Planos
+          </span>
+        </button>
+
+        <button
+          data-view="settings"
+          type="button"
+        >
+          ⚙️
+          <span>
+            Configurações
+          </span>
+        </button>
+
+      </nav>
+
+
+      <div class="side-user">
+
+        <div class="user-message-avatar">
+          U
+        </div>
+
+        <div>
+
+          <strong id="userName">
+            Usuário
+          </strong>
+
+          <span>
+            Conta VÉRTEX
+          </span>
+
+        </div>
+
+      </div>
+
+    </aside>
+
+
+    <!-- CONTEÚDO -->
+
+    <main class="main">
+
+      <header class="topbar">
+
+        <button
+          class="mobile-menu"
+          type="button"
+          onclick="document.body.classList.toggle('menu-open')"
+        >
+          ☰
+        </button>
+
+        <div>
+
+          <h1 id="title">
+            Dashboard
+          </h1>
+
+          <p
+            id="sub"
+            class="muted"
+          >
+            Seu ponto de partida para renda extra no digital.
+          </p>
+
+        </div>
+
+        <div class="top-user">
+
+          <div class="user-message-avatar">
+            U
+          </div>
+
+        </div>
+
+      </header>
+
+
+      <!-- DASHBOARD -->
+
+      <section
+        id="dashboard"
+        class="view"
+      ></section>
+
+
+      <!-- CHAT -->
+
+      <section
+        id="workspace"
+        class="view"
+      ></section>
+
+
+      <!-- FERRAMENTAS -->
+
+      <section
+        id="templates"
+        class="view"
+      ></section>
+
+
+      <!-- BÔNUS -->
+
+      <section
+        id="bonuses"
+        class="view"
+      ></section>
+
+
+      <!-- PROJETOS -->
+
+      <section
+        id="projects"
+        class="view"
+      ></section>
+
+
+      <!-- HISTÓRICO -->
+
+      <section
+        id="history"
+        class="view"
+      ></section>
+
+
+      <!-- PLANOS -->
+
+      <section
+        id="plans"
+        class="view"
+      ></section>
+
+
+      <!-- CONFIGURAÇÕES -->
+
+      <section
+        id="settings"
+        class="view"
+      ></section>
+
+    </main>
+
+  </div>
+
 
   <script src="/app.js"></script>
 
 </body>
+
 </html>
