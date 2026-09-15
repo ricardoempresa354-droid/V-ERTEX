@@ -644,19 +644,22 @@ app.get("/api/plans", (req, res) => {
         id: "FREE",
         name: "Grátis",
         price: "R$ 0",
-        credits: 30
+        credits: 30,
+        checkout: null
       },
       {
         id: "PRO",
         name: "PRO",
-        price: "R$ 29,90",
-        credits: 500
+        price: "R$ 39,90",
+        credits: 500,
+        checkout: "https://pay.cakto.com.br/ubpqtkf_1087308"
       },
       {
         id: "PRO_ANNUAL",
         name: "PRO Anual",
-        price: "R$ 299,90",
-        credits: 8000
+        price: "R$ 190,00",
+        credits: 8000,
+        checkout: "https://pay.cakto.com.br/qikjmty"
       }
     ]
   });
