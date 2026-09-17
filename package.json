@@ -1,7 +1,7 @@
 {
   "name": "vertex-ai",
-  "version": "5.0.0",
-  "description": "VÉRTEX AI - Assistente de renda extra e marketing digital",
+  "version": "6.0.0",
+  "description": "VÉRTEX AI - Assistente para renda extra no digital",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
