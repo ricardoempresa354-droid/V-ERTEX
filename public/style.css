@@ -1532,3 +1532,173 @@ button:disabled {
     flex-shrink: 0;
   }
 }
+/* =========================
+   AJUSTE DAS BOLHAS DO CHAT
+========================= */
+
+.messages {
+  padding: 24px 16px 125px;
+}
+
+.message-row {
+  margin-bottom: 14px;
+  width: 100%;
+}
+
+.message-wrap {
+  max-width: 680px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* BOLHA DO USUÁRIO */
+.message-row.message-user {
+  justify-content: flex-end;
+}
+
+.message-row.message-user .message-wrap {
+  flex-direction: row-reverse;
+  max-width: 600px;
+}
+
+.message-row.message-user .message-bubble {
+  background: #eeeeee;
+  border: none;
+  border-radius: 18px;
+  border-bottom-right-radius: 5px;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  width: auto;
+  max-width: 520px;
+}
+
+/* BOLHA DA VÉRTEX */
+.message-row.message-vertex {
+  justify-content: flex-start;
+}
+
+.message-row.message-vertex .message-wrap {
+  max-width: 680px;
+}
+
+.message-row.message-vertex .message-bubble {
+  background: #f7f7f8;
+  border: 1px solid #e5e5e5;
+  border-radius: 18px;
+  border-bottom-left-radius: 5px;
+  padding: 11px 15px;
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 600px;
+  width: fit-content;
+}
+
+/* TEXTO DA MENSAGEM */
+.message-text {
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* NOME DA VÉRTEX */
+.message-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #777;
+  margin-bottom: 4px;
+}
+
+/* AVATAR DA VÉRTEX */
+.vertex-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+}
+
+/* AVATAR DO USUÁRIO */
+.user-message-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+}
+
+/* =========================
+   COMPOSITOR MAIS COMPACTO
+========================= */
+
+.composer {
+  max-width: 760px;
+  min-height: 52px;
+  border-radius: 18px;
+  padding: 6px;
+}
+
+.composer textarea {
+  min-height: 38px;
+  max-height: 130px;
+  padding: 9px 8px;
+  font-size: 15px;
+}
+
+.plus-button,
+.send-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+/* =========================
+   CELULAR
+========================= */
+
+@media (max-width: 800px) {
+
+  .messages {
+    padding: 18px 12px 120px;
+  }
+
+  .message-wrap {
+    max-width: 92%;
+    gap: 7px;
+  }
+
+  .message-row.message-user .message-wrap {
+    max-width: 88%;
+  }
+
+  .message-row.message-user .message-bubble {
+    max-width: 82%;
+    font-size: 15px;
+    padding: 9px 13px;
+    border-radius: 17px;
+    border-bottom-right-radius: 5px;
+  }
+
+  .message-row.message-vertex .message-bubble {
+    max-width: calc(100vw - 75px);
+    font-size: 15px;
+    padding: 10px 13px;
+    border-radius: 17px;
+    border-bottom-left-radius: 5px;
+  }
+
+  .vertex-avatar,
+  .user-message-avatar {
+    width: 29px;
+    height: 29px;
+    min-width: 29px;
+  }
+
+  .composer-area {
+    padding: 7px 10px 12px;
+  }
+
+  .composer {
+    border-radius: 19px;
+  }
+}
