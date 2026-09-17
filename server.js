@@ -13,19 +13,30 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   "vertex-secret-change-me";
 
+/* =========================
+   BANCO DE DADOS
+========================= */
+
 const dbDir =
+  process.env.RAILWAY_VOLUME_MOUNT_PATH ||
   path.join(__dirname, "data");
 
 fs.mkdirSync(dbDir, {
   recursive: true
 });
 
-const db =
-  new Database(
-    path.join(dbDir, "vertex.db")
-  );
+const dbPath = path.join(
+  dbDir,
+  "vertex.db"
+);
+
+const db = new Database(dbPath);
 
 db.pragma("journal_mode = WAL");
+
+/* =========================
+   TABELAS
+========================= */
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -65,6 +76,10 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 `);
 
+/* =========================
+   MIDDLEWARE
+========================= */
+
 app.use(
   express.json({
     limit: "2mb"
@@ -77,13 +92,17 @@ app.use(
   })
 );
 
-
-/* =====================================================
+/* =========================
    FUNÇÕES
-===================================================== */
+========================= */
+
+function cleanText(text) {
+  return String(text || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
 
 function createToken(user) {
-
   return jwt.sign(
     {
       id: user.id,
@@ -96,45 +115,38 @@ function createToken(user) {
   );
 }
 
-
 function auth(req, res, next) {
-
-  const header =
-    req.headers.authorization || "";
-
-  const token =
-    header.startsWith("Bearer ")
-      ? header.slice(7)
-      : null;
-
-  if (!token) {
-
-    return res.status(401).json({
-      error: "Não autorizado."
-    });
-  }
-
   try {
+    const header =
+      req.headers.authorization || "";
 
-    req.user =
+    if (!header.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "Não autorizado."
+      });
+    }
+
+    const token =
+      header.slice(7);
+
+    const decoded =
       jwt.verify(
         token,
         JWT_SECRET
       );
 
+    req.user = decoded;
+
     next();
 
-  } catch {
-
+  } catch (error) {
     return res.status(401).json({
-      error: "Sessão expirada."
+      error: "Sessão expirada. Entre novamente."
     });
   }
 }
 
-
 function getUser(id) {
-
   return db.prepare(`
     SELECT
       id,
@@ -148,37 +160,21 @@ function getUser(id) {
   `).get(id);
 }
 
-
-function cleanText(text) {
-
-  return String(text || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 10000);
-}
-
-
-/* =====================================================
+/* =========================
    HEALTH
-===================================================== */
+========================= */
 
-app.get(
-  "/health",
-  (req, res) => {
+app.get("/health", (req, res) => {
+  res.json({
+    ok: true,
+    service: "VÉRTEX AI",
+    version: "5.1.0"
+  });
+});
 
-    res.json({
-      ok: true,
-      service: "VÉRTEX AI",
-      version: "6.0.0"
-    });
-
-  }
-);
-
-
-/* =====================================================
+/* =========================
    AUTH
-===================================================== */
+========================= */
 
 app.post(
   "/api/auth/register",
@@ -188,8 +184,9 @@ app.post(
       cleanText(req.body.name);
 
     const email =
-      cleanText(req.body.email)
-        .toLowerCase();
+      cleanText(
+        req.body.email
+      ).toLowerCase();
 
     const password =
       String(
@@ -201,7 +198,6 @@ app.post(
       !email ||
       password.length < 6
     ) {
-
       return res.status(400).json({
         error:
           "Preencha nome, e-mail e uma senha com pelo menos 6 caracteres."
@@ -216,7 +212,6 @@ app.post(
       `).get(email);
 
     if (exists) {
-
       return res.status(409).json({
         error:
           "Este e-mail já está cadastrado."
@@ -229,74 +224,136 @@ app.post(
         10
       );
 
-    const result =
-      db.prepare(`
-        INSERT INTO users (
+    try {
+
+      const result =
+        db.prepare(`
+          INSERT INTO users (
+            name,
+            email,
+            password
+          )
+          VALUES (?, ?, ?)
+        `).run(
           name,
           email,
-          password
-        )
-        VALUES (?, ?, ?)
-      `).run(
-        name,
-        email,
-        hash
-      );
+          hash
+        );
 
-    const user =
-      getUser(
-        result.lastInsertRowid
-      );
+      const user =
+        getUser(
+          result.lastInsertRowid
+        );
 
-    res.json({
-      token: createToken(user),
-      user
-    });
+      return res.json({
+        token: createToken(user),
+        user
+      });
+
+    } catch (error) {
+
+      if (
+        String(error.message)
+          .includes("UNIQUE")
+      ) {
+        return res.status(409).json({
+          error:
+            "Este e-mail já está cadastrado."
+        });
+      }
+
+      console.error(error);
+
+      return res.status(500).json({
+        error:
+          "Não foi possível criar a conta."
+      });
+    }
   }
 );
 
+/* =========================
+   LOGIN
+========================= */
 
 app.post(
   "/api/auth/login",
   (req, res) => {
 
     const email =
-      cleanText(req.body.email)
-        .toLowerCase();
+      cleanText(
+        req.body.email
+      ).toLowerCase();
 
     const password =
       String(
         req.body.password || ""
       );
 
+    if (!email || !password) {
+      return res.status(400).json({
+        error:
+          "Informe seu e-mail e sua senha."
+      });
+    }
+
     const user =
       db.prepare(`
         SELECT *
         FROM users
-        WHERE email = ?
+        WHERE LOWER(email) = LOWER(?)
+        LIMIT 1
       `).get(email);
 
-    if (
-      !user ||
-      !bcrypt.compareSync(
-        password,
-        user.password
-      )
-    ) {
-
+    if (!user) {
       return res.status(401).json({
         error:
           "E-mail ou senha incorretos."
       });
     }
 
-    res.json({
-      token: createToken(user),
-      user: getUser(user.id)
+    let passwordOk = false;
+
+    try {
+
+      passwordOk =
+        bcrypt.compareSync(
+          password,
+          user.password
+        );
+
+    } catch (error) {
+
+      console.error(
+        "Erro ao verificar senha:",
+        error
+      );
+
+      passwordOk = false;
+    }
+
+    if (!passwordOk) {
+      return res.status(401).json({
+        error:
+          "E-mail ou senha incorretos."
+      });
+    }
+
+    const cleanUser =
+      getUser(user.id);
+
+    return res.json({
+      token:
+        createToken(cleanUser),
+      user:
+        cleanUser
     });
   }
 );
 
+/* =========================
+   USUÁRIO
+========================= */
 
 app.get(
   "/api/me",
@@ -307,7 +364,6 @@ app.get(
       getUser(req.user.id);
 
     if (!user) {
-
       return res.status(404).json({
         error:
           "Usuário não encontrado."
@@ -320,10 +376,9 @@ app.get(
   }
 );
 
-
-/* =====================================================
+/* =========================
    CHATS
-===================================================== */
+========================= */
 
 app.get(
   "/api/chats",
@@ -357,6 +412,9 @@ app.get(
   }
 );
 
+/* =========================
+   NOVO CHAT
+========================= */
 
 app.post(
   "/api/chats",
@@ -396,6 +454,9 @@ app.post(
   }
 );
 
+/* =========================
+   CHAT ESPECÍFICO
+========================= */
 
 app.get(
   "/api/chats/:id",
@@ -414,7 +475,6 @@ app.get(
       );
 
     if (!chat) {
-
       return res.status(404).json({
         error:
           "Conversa não encontrada."
@@ -431,7 +491,9 @@ app.get(
         FROM messages
         WHERE chat_id = ?
         ORDER BY id ASC
-      `).all(chat.id);
+      `).all(
+        chat.id
+      );
 
     res.json({
       chat,
@@ -440,10 +502,56 @@ app.get(
   }
 );
 
+/* =========================
+   APAGAR CHAT
+========================= */
 
-/* =====================================================
+app.delete(
+  "/api/chats/:id",
+  auth,
+  (req, res) => {
+
+    const chat =
+      db.prepare(`
+        SELECT id
+        FROM chats
+        WHERE id = ?
+        AND user_id = ?
+      `).get(
+        req.params.id,
+        req.user.id
+      );
+
+    if (!chat) {
+      return res.status(404).json({
+        error:
+          "Conversa não encontrada."
+      });
+    }
+
+    db.prepare(`
+      DELETE FROM messages
+      WHERE chat_id = ?
+    `).run(
+      chat.id
+    );
+
+    db.prepare(`
+      DELETE FROM chats
+      WHERE id = ?
+    `).run(
+      chat.id
+    );
+
+    res.json({
+      ok: true
+    });
+  }
+);
+
+/* =========================
    HISTÓRICO
-===================================================== */
+========================= */
 
 app.get(
   "/api/history",
@@ -475,10 +583,9 @@ app.get(
   }
 );
 
-
-/* =====================================================
+/* =========================
    MENSAGENS
-===================================================== */
+========================= */
 
 app.post(
   "/api/chats/:id/messages",
@@ -497,7 +604,6 @@ app.post(
       );
 
     if (!chat) {
-
       return res.status(404).json({
         error:
           "Conversa não encontrada."
@@ -510,7 +616,6 @@ app.post(
       );
 
     if (!content) {
-
       return res.status(400).json({
         error:
           "Mensagem vazia."
@@ -529,6 +634,11 @@ app.post(
       content
     );
 
+    const title =
+      content.length > 45
+        ? content.slice(0, 45) + "..."
+        : content;
+
     db.prepare(`
       UPDATE chats
       SET
@@ -540,9 +650,7 @@ app.post(
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
-      content.length > 45
-        ? content.slice(0, 45) + "..."
-        : content,
+      title,
       chat.id
     );
 
@@ -552,10 +660,9 @@ app.post(
   }
 );
 
-
-/* =====================================================
+/* =========================
    IA
-===================================================== */
+========================= */
 
 async function generateAI(messages) {
 
@@ -565,10 +672,9 @@ async function generateAI(messages) {
   if (!apiKey) {
 
     return {
-      demo: true,
-
       text:
-        "A VÉRTEX AI está funcionando, mas a chave da IA ainda não foi configurada no Railway."
+        "A VÉRTEX AI está funcionando em modo de demonstração. Configure a variável AI_API_KEY no Railway para ativar a resposta da IA.",
+      demo: true
     };
   }
 
@@ -590,76 +696,100 @@ async function generateAI(messages) {
           "Content-Type":
             "application/json",
 
-          Authorization:
+          "Authorization":
             `Bearer ${apiKey}`
         },
 
         body: JSON.stringify({
           model,
-
-          input: messages.map(
-            message => ({
-              role: message.role,
-              content: [
-                {
-                  type: "input_text",
-                  text: message.content
-                }
-              ]
-            })
-          )
+          input: messages
         })
       }
     );
 
+  const raw =
+    await response.text();
+
+  let data;
+
+  try {
+    data =
+      JSON.parse(raw);
+  } catch {
+    data = null;
+  }
+
   if (!response.ok) {
 
-    const errorText =
-      await response.text();
-
     console.error(
-      "AI ERROR:",
-      errorText
+      "Erro da API de IA:",
+      response.status,
+      raw
     );
 
     throw new Error(
-      "Falha no provedor de IA."
+      "Erro na API de IA."
     );
   }
 
-  const data =
-    await response.json();
+  let text = "";
 
-  let text =
-    data.output_text;
-
-  if (!text && Array.isArray(data.output)) {
-
+  if (
+    data &&
+    typeof data.output_text === "string"
+  ) {
     text =
-      data.output
-        .flatMap(
-          item =>
-            item.content || []
+      data.output_text;
+  }
+
+  if (
+    !text &&
+    data &&
+    Array.isArray(data.output)
+  ) {
+
+    for (
+      const item of data.output
+    ) {
+
+      if (
+        !Array.isArray(
+          item.content
         )
-        .map(
-          item =>
-            item.text || ""
-        )
-        .join("");
+      ) {
+        continue;
+      }
+
+      for (
+        const part of item.content
+      ) {
+
+        if (
+          typeof part.text ===
+          "string"
+        ) {
+          text +=
+            part.text;
+        }
+      }
+    }
   }
 
   if (!text) {
-
     text =
-      "Não consegui obter uma resposta da IA.";
+      "A IA respondeu, mas não foi possível interpretar a resposta.";
   }
 
   return {
-    demo: false,
-    text
+    text:
+      text.trim(),
+    demo: false
   };
 }
 
+/* =========================
+   GERAR RESPOSTA IA
+========================= */
 
 app.post(
   "/api/ai/generate",
@@ -682,7 +812,6 @@ app.post(
         !chatId ||
         !prompt
       ) {
-
         return res.status(400).json({
           error:
             "Chat ou mensagem inválida."
@@ -701,7 +830,6 @@ app.post(
         );
 
       if (!chat) {
-
         return res.status(404).json({
           error:
             "Conversa não encontrada."
@@ -717,15 +845,16 @@ app.post(
           WHERE chat_id = ?
           ORDER BY id ASC
           LIMIT 30
-        `).all(chatId);
+        `).all(
+          chatId
+        );
 
       const aiMessages = [
 
         {
-          role: "system",
-
+          role: "user",
           content:
-            "Você é a VÉRTEX AI, uma assistente profissional brasileira especializada em marketing digital, criação de conteúdo, vendas online, afiliados, copywriting, anúncios, funis e estratégias legítimas para geração de renda. Responda em português do Brasil. Seja prática, clara, objetiva e profissional."
+            "Você é a VÉRTEX AI, uma assistente profissional especializada em marketing digital, criação de conteúdo, vendas online, afiliados, copywriting, anúncios, funis, estratégias digitais e ideias legítimas para geração de renda. Responda em português do Brasil, de forma prática, clara e profissional."
         },
 
         ...history,
@@ -756,7 +885,8 @@ app.post(
 
       db.prepare(`
         UPDATE chats
-        SET updated_at = CURRENT_TIMESTAMP
+        SET updated_at =
+          CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(
         chatId
@@ -764,13 +894,18 @@ app.post(
 
       res.json({
         ok: true,
-        message: result.text,
-        demo: result.demo
+        message:
+          result.text,
+        demo:
+          result.demo
       });
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        "Erro ao gerar IA:",
+        error
+      );
 
       res.status(500).json({
         error:
@@ -780,10 +915,9 @@ app.post(
   }
 );
 
-
-/* =====================================================
+/* =========================
    PROJETOS
-===================================================== */
+========================= */
 
 app.get(
   "/api/projects",
@@ -806,6 +940,9 @@ app.get(
   }
 );
 
+/* =========================
+   NOVO PROJETO
+========================= */
 
 app.post(
   "/api/projects",
@@ -823,7 +960,6 @@ app.post(
       );
 
     if (!title) {
-
       return res.status(400).json({
         error:
           "Informe um nome para o projeto."
@@ -838,11 +974,12 @@ app.post(
           description,
           status
         )
-        VALUES (?, ?, ?, 'Ativo')
+        VALUES (?, ?, ?, ?)
       `).run(
         req.user.id,
         title,
-        description
+        description,
+        "Ativo"
       );
 
     const project =
@@ -860,17 +997,128 @@ app.post(
   }
 );
 
+/* =========================
+   EDITAR PROJETO
+========================= */
 
-/* =====================================================
+app.put(
+  "/api/projects/:id",
+  auth,
+  (req, res) => {
+
+    const project =
+      db.prepare(`
+        SELECT id
+        FROM projects
+        WHERE id = ?
+        AND user_id = ?
+      `).get(
+        req.params.id,
+        req.user.id
+      );
+
+    if (!project) {
+      return res.status(404).json({
+        error:
+          "Projeto não encontrado."
+      });
+    }
+
+    const title =
+      cleanText(
+        req.body.title
+      );
+
+    const description =
+      cleanText(
+        req.body.description
+      );
+
+    const status =
+      cleanText(
+        req.body.status
+      ) ||
+      "Em andamento";
+
+    if (!title) {
+      return res.status(400).json({
+        error:
+          "Informe um nome para o projeto."
+      });
+    }
+
+    db.prepare(`
+      UPDATE projects
+      SET
+        title = ?,
+        description = ?,
+        status = ?,
+        updated_at =
+          CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      title,
+      description,
+      status,
+      project.id
+    );
+
+    const updated =
+      db.prepare(`
+        SELECT *
+        FROM projects
+        WHERE id = ?
+      `).get(
+        project.id
+      );
+
+    res.json({
+      project: updated
+    });
+  }
+);
+
+/* =========================
+   APAGAR PROJETO
+========================= */
+
+app.delete(
+  "/api/projects/:id",
+  auth,
+  (req, res) => {
+
+    const result =
+      db.prepare(`
+        DELETE FROM projects
+        WHERE id = ?
+        AND user_id = ?
+      `).run(
+        req.params.id,
+        req.user.id
+      );
+
+    if (!result.changes) {
+      return res.status(404).json({
+        error:
+          "Projeto não encontrado."
+      });
+    }
+
+    res.json({
+      ok: true
+    });
+  }
+);
+
+/* =========================
    PLANOS
-===================================================== */
+========================= */
 
 app.get(
   "/api/plans",
   (req, res) => {
 
     res.json({
-
       plans: [
 
         {
@@ -892,7 +1140,7 @@ app.get(
 
         {
           id: "PRO_ANNUAL",
-          name: "PRO Anual",
+          name: "Pro Anual",
           price: "R$ 190,00",
           credits: 8000,
           checkout:
@@ -900,15 +1148,13 @@ app.get(
         }
 
       ]
-
     });
   }
 );
 
-
-/* =====================================================
-   STATIC
-===================================================== */
+/* =========================
+   ARQUIVOS DO SITE
+========================= */
 
 app.use(
   express.static(
@@ -919,6 +1165,9 @@ app.use(
   )
 );
 
+/* =========================
+   SPA
+========================= */
 
 app.get(
   "/{*splat}",
@@ -934,10 +1183,9 @@ app.get(
   }
 );
 
-
-/* =====================================================
-   START
-===================================================== */
+/* =========================
+   SERVIDOR
+========================= */
 
 app.listen(
   PORT,
@@ -947,5 +1195,8 @@ app.listen(
       `VÉRTEX AI rodando na porta ${PORT}`
     );
 
+    console.log(
+      `Banco de dados: ${dbPath}`
+    );
   }
 );
