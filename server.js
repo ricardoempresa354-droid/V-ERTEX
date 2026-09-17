@@ -1,95 +1,69 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const Database = require("better-sqlite3");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-const Database =
-  require("better-sqlite3");
+const app = express();
 
-const bcrypt =
-  require("bcryptjs");
-
-const jwt =
-  require("jsonwebtoken");
-
-const app =
-  express();
-
-const PORT =
-  process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   "vertex-secret-change-me";
 
-
-/* =========================================
-   BANCO
-========================================= */
-
 const dbDir =
-  path.join(
-    __dirname,
-    "data"
-  );
+  path.join(__dirname, "data");
 
-fs.mkdirSync(
-  dbDir,
-  {
-    recursive: true
-  }
-);
+fs.mkdirSync(dbDir, {
+  recursive: true
+});
 
 const db =
   new Database(
-    path.join(
-      dbDir,
-      "vertex.db"
-    )
+    path.join(dbDir, "vertex.db")
   );
 
-db.pragma(
-  "journal_mode = WAL"
-);
-
+db.pragma("journal_mode = WAL");
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    plan TEXT DEFAULT 'FREE',
-    credits INTEGER DEFAULT 30,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  plan TEXT DEFAULT 'FREE',
+  credits INTEGER DEFAULT 30,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
-  CREATE TABLE IF NOT EXISTS chats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    title TEXT DEFAULT 'Nova conversa',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS chats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  title TEXT DEFAULT 'Nova conversa',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
-  CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    status TEXT DEFAULT 'Ativo',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  status TEXT DEFAULT 'Ativo',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
-
 
 app.use(
   express.json({
@@ -104,9 +78,9 @@ app.use(
 );
 
 
-/* =========================================
+/* =====================================================
    FUNÇÕES
-========================================= */
+===================================================== */
 
 function createToken(user) {
 
@@ -136,7 +110,7 @@ function auth(req, res, next) {
   if (!token) {
 
     return res.status(401).json({
-      error: "Não autenticado."
+      error: "Não autorizado."
     });
   }
 
@@ -177,17 +151,16 @@ function getUser(id) {
 
 function cleanText(text) {
 
-  return String(
-    text ?? ""
-  )
+  return String(text || "")
     .trim()
+    .replace(/\s+/g, " ")
     .slice(0, 10000);
 }
 
 
-/* =========================================
+/* =====================================================
    HEALTH
-========================================= */
+===================================================== */
 
 app.get(
   "/health",
@@ -198,13 +171,14 @@ app.get(
       service: "VÉRTEX AI",
       version: "6.0.0"
     });
+
   }
 );
 
 
-/* =========================================
+/* =====================================================
    AUTH
-========================================= */
+===================================================== */
 
 app.post(
   "/api/auth/register",
@@ -214,9 +188,8 @@ app.post(
       cleanText(req.body.name);
 
     const email =
-      cleanText(
-        req.body.email
-      ).toLowerCase();
+      cleanText(req.body.email)
+        .toLowerCase();
 
     const password =
       String(
@@ -288,9 +261,8 @@ app.post(
   (req, res) => {
 
     const email =
-      cleanText(
-        req.body.email
-      ).toLowerCase();
+      cleanText(req.body.email)
+        .toLowerCase();
 
     const password =
       String(
@@ -319,11 +291,8 @@ app.post(
     }
 
     res.json({
-      token:
-        createToken(user),
-
-      user:
-        getUser(user.id)
+      token: createToken(user),
+      user: getUser(user.id)
     });
   }
 );
@@ -352,9 +321,9 @@ app.get(
 );
 
 
-/* =========================================
+/* =====================================================
    CHATS
-========================================= */
+===================================================== */
 
 app.get(
   "/api/chats",
@@ -472,9 +441,9 @@ app.get(
 );
 
 
-/* =========================================
+/* =====================================================
    HISTÓRICO
-========================================= */
+===================================================== */
 
 app.get(
   "/api/history",
@@ -507,9 +476,9 @@ app.get(
 );
 
 
-/* =========================================
+/* =====================================================
    MENSAGENS
-========================================= */
+===================================================== */
 
 app.post(
   "/api/chats/:id/messages",
@@ -563,14 +532,12 @@ app.post(
     db.prepare(`
       UPDATE chats
       SET
-        title =
-          CASE
-            WHEN title = 'Nova conversa'
-            THEN ?
-            ELSE title
-          END,
-        updated_at =
-          CURRENT_TIMESTAMP
+        title = CASE
+          WHEN title = 'Nova conversa'
+          THEN ?
+          ELSE title
+        END,
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       content.length > 45
@@ -586,44 +553,24 @@ app.post(
 );
 
 
-/* =========================================
+/* =====================================================
    IA
-========================================= */
+===================================================== */
 
 async function generateAI(messages) {
 
   const apiKey =
     process.env.AI_API_KEY;
 
-  /*
-    Sem chave, usamos modo demonstração.
-    Isso permite testar o site sem pagar API.
-  */
-
   if (!apiKey) {
-
-    const last =
-      messages[
-        messages.length - 1
-      ];
 
     return {
       demo: true,
 
       text:
-        `Entendi sua ideia: "${last.content}"
-
-Para transformar isso em uma estratégia prática, podemos trabalhar em 4 etapas:
-
-1. Definir o produto ou serviço.
-2. Definir o público que você quer alcançar.
-3. Criar conteúdo e ofertas.
-4. Testar diferentes formas de divulgação e acompanhar os resultados.
-
-Se você quiser, posso montar o próximo passo de forma prática dentro da VÉRTEX AI.`
+        "A VÉRTEX AI está funcionando, mas a chave da IA ainda não foi configurada no Railway."
     };
   }
-
 
   const apiUrl =
     process.env.AI_API_URL ||
@@ -632,7 +579,6 @@ Se você quiser, posso montar o próximo passo de forma prática dentro da VÉRT
   const model =
     process.env.AI_MODEL ||
     "gpt-5.6-luna";
-
 
   const response =
     await fetch(
@@ -644,25 +590,27 @@ Se você quiser, posso montar o próximo passo de forma prática dentro da VÉRT
           "Content-Type":
             "application/json",
 
-          "Authorization":
+          Authorization:
             `Bearer ${apiKey}`
         },
 
         body: JSON.stringify({
           model,
-          input: messages.map(
-            (message) => ({
-              role:
-                message.role,
 
-              content:
-                message.content
+          input: messages.map(
+            message => ({
+              role: message.role,
+              content: [
+                {
+                  type: "input_text",
+                  text: message.content
+                }
+              ]
             })
           )
         })
       }
     );
-
 
   if (!response.ok) {
 
@@ -675,42 +623,36 @@ Se você quiser, posso montar o próximo passo de forma prática dentro da VÉRT
     );
 
     throw new Error(
-      "A IA não conseguiu responder agora."
+      "Falha no provedor de IA."
     );
   }
-
 
   const data =
     await response.json();
 
-
   let text =
     data.output_text;
 
-
-  if (!text && data.output) {
+  if (!text && Array.isArray(data.output)) {
 
     text =
       data.output
         .flatMap(
-          (item) =>
+          item =>
             item.content || []
         )
         .map(
-          (item) =>
+          item =>
             item.text || ""
         )
         .join("");
   }
 
-
   if (!text) {
 
-    throw new Error(
-      "A IA retornou uma resposta vazia."
-    );
+    text =
+      "Não consegui obter uma resposta da IA.";
   }
-
 
   return {
     demo: false,
@@ -747,7 +689,6 @@ app.post(
         });
       }
 
-
       const chat =
         db.prepare(`
           SELECT id
@@ -759,7 +700,6 @@ app.post(
           req.user.id
         );
 
-
       if (!chat) {
 
         return res.status(404).json({
@@ -767,24 +707,6 @@ app.post(
             "Conversa não encontrada."
         });
       }
-
-
-      /*
-        Salva a mensagem do usuário.
-      */
-
-      db.prepare(`
-        INSERT INTO messages (
-          chat_id,
-          role,
-          content
-        )
-        VALUES (?, 'user', ?)
-      `).run(
-        chatId,
-        prompt
-      );
-
 
       const history =
         db.prepare(`
@@ -797,22 +719,28 @@ app.post(
           LIMIT 30
         `).all(chatId);
 
-
       const aiMessages = [
+
         {
           role: "system",
-          content:
-            "Você é a VÉRTEX AI, uma assistente profissional especializada em marketing digital, criação de conteúdo, vendas online, afiliados, copywriting, anúncios, funis e estratégias legítimas de geração de renda. Responda em português do Brasil de forma clara, prática e responsável."
-        },
-        ...history
-      ];
 
+          content:
+            "Você é a VÉRTEX AI, uma assistente profissional brasileira especializada em marketing digital, criação de conteúdo, vendas online, afiliados, copywriting, anúncios, funis e estratégias legítimas para geração de renda. Responda em português do Brasil. Seja prática, clara, objetiva e profissional."
+        },
+
+        ...history,
+
+        {
+          role: "user",
+          content: prompt
+        }
+
+      ];
 
       const result =
         await generateAI(
           aiMessages
         );
-
 
       db.prepare(`
         INSERT INTO messages (
@@ -826,30 +754,23 @@ app.post(
         result.text
       );
 
-
       db.prepare(`
         UPDATE chats
-        SET updated_at =
-          CURRENT_TIMESTAMP
+        SET updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(
         chatId
       );
 
-
       res.json({
         ok: true,
-        message:
-          result.text,
-        demo:
-          result.demo
+        message: result.text,
+        demo: result.demo
       });
 
     } catch (error) {
 
-      console.error(
-        error
-      );
+      console.error(error);
 
       res.status(500).json({
         error:
@@ -860,9 +781,9 @@ app.post(
 );
 
 
-/* =========================================
+/* =====================================================
    PROJETOS
-========================================= */
+===================================================== */
 
 app.get(
   "/api/projects",
@@ -909,7 +830,6 @@ app.post(
       });
     }
 
-
     const result =
       db.prepare(`
         INSERT INTO projects (
@@ -918,14 +838,12 @@ app.post(
           description,
           status
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, 'Ativo')
       `).run(
         req.user.id,
         title,
-        description,
-        "Ativo"
+        description
       );
-
 
     const project =
       db.prepare(`
@@ -936,7 +854,6 @@ app.post(
         result.lastInsertRowid
       );
 
-
     res.json({
       project
     });
@@ -944,168 +861,54 @@ app.post(
 );
 
 
-app.put(
-  "/api/projects/:id",
-  auth,
-  (req, res) => {
-
-    const project =
-      db.prepare(`
-        SELECT id
-        FROM projects
-        WHERE id = ?
-        AND user_id = ?
-      `).get(
-        req.params.id,
-        req.user.id
-      );
-
-
-    if (!project) {
-
-      return res.status(404).json({
-        error:
-          "Projeto não encontrado."
-      });
-    }
-
-
-    const title =
-      cleanText(
-        req.body.title
-      );
-
-    const description =
-      cleanText(
-        req.body.description
-      );
-
-    const status =
-      cleanText(
-        req.body.status
-      ) ||
-      "Ativo";
-
-
-    db.prepare(`
-      UPDATE projects
-      SET
-        title = ?,
-        description = ?,
-        status = ?,
-        updated_at =
-          CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      title,
-      description,
-      status,
-      project.id
-    );
-
-
-    res.json({
-      project:
-        db.prepare(`
-          SELECT *
-          FROM projects
-          WHERE id = ?
-        `).get(project.id)
-    });
-  }
-);
-
-
-app.delete(
-  "/api/projects/:id",
-  auth,
-  (req, res) => {
-
-    const result =
-      db.prepare(`
-        DELETE FROM projects
-        WHERE id = ?
-        AND user_id = ?
-      `).run(
-        req.params.id,
-        req.user.id
-      );
-
-
-    if (!result.changes) {
-
-      return res.status(404).json({
-        error:
-          "Projeto não encontrado."
-      });
-    }
-
-
-    res.json({
-      ok: true
-    });
-  }
-);
-
-
-/* =========================================
+/* =====================================================
    PLANOS
-========================================= */
+===================================================== */
 
 app.get(
   "/api/plans",
   (req, res) => {
 
     res.json({
+
       plans: [
 
         {
           id: "FREE",
-
           name: "Grátis",
-
           price: "R$ 0",
-
           credits: 30,
-
           checkout: null
         },
 
         {
           id: "PRO",
-
           name: "PRO",
-
           price: "R$ 39,90",
-
           credits: 500,
-
           checkout:
             "https://pay.cakto.com.br/ubpqtkf_1087308"
         },
 
         {
           id: "PRO_ANNUAL",
-
           name: "PRO Anual",
-
           price: "R$ 190,00",
-
           credits: 8000,
-
           checkout:
             "https://pay.cakto.com.br/qikjmty"
         }
 
       ]
+
     });
   }
 );
 
 
-/* =========================================
-   ARQUIVOS
-========================================= */
+/* =====================================================
+   STATIC
+===================================================== */
 
 app.use(
   express.static(
@@ -1132,9 +935,9 @@ app.get(
 );
 
 
-/* =========================================
-   SERVIDOR
-========================================= */
+/* =====================================================
+   START
+===================================================== */
 
 app.listen(
   PORT,
