@@ -2,12 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
-
   <meta name="theme-color" content="#ffffff">
 
   <title>VÉRTEX AI</title>
@@ -18,15 +16,12 @@
 <body>
 
   <!-- LOGIN -->
-
   <section id="auth" class="auth">
 
     <div class="auth-card">
 
       <div class="auth-logo">
-        <svg viewBox="0 0 100 100">
-          <path d="M14 10h27l9 17 9-17h27L50 90 14 10z"/>
-        </svg>
+        V
       </div>
 
       <h1>VÉRTEX AI</h1>
@@ -67,22 +62,16 @@
 
 
   <!-- APLICAÇÃO -->
-
   <div id="app" class="app hidden">
 
     <!-- SIDEBAR -->
-
     <aside class="side">
 
-      <div class="side-brand">
+      <div class="brand">
 
-        <div class="brand-mark">
-          <svg viewBox="0 0 100 100">
-            <path d="M14 10h27l9 17 9-17h27L50 90 14 10z"/>
-          </svg>
-        </div>
+        <div class="brand-mark">V</div>
 
-        <div>
+        <div class="brand-text">
           <strong>VÉRTEX AI</strong>
           <span>Especialista em renda extra</span>
         </div>
@@ -92,51 +81,51 @@
       <button
         class="new-chat"
         type="button"
-        onclick="openAI('')"
+        onclick="newChat()"
       >
-        <span>＋</span>
-        Nova conversa
+        <span class="new-chat-icon">＋</span>
+        <span>Nova conversa</span>
       </button>
 
       <nav>
 
         <button data-view="dashboard" type="button">
-          <span>⌂</span>
+          <span class="nav-icon">⌂</span>
           <span>Dashboard</span>
         </button>
 
         <button data-view="workspace" type="button">
-          <span>✦</span>
+          <span class="nav-icon">✦</span>
           <span>VÉRTEX IA</span>
         </button>
 
         <button data-view="templates" type="button">
-          <span>⌘</span>
+          <span class="nav-icon">▦</span>
           <span>Ferramentas</span>
         </button>
 
         <button data-view="bonuses" type="button">
-          <span>🎁</span>
+          <span class="nav-icon">◇</span>
           <span>Bônus</span>
         </button>
 
         <button data-view="projects" type="button">
-          <span>□</span>
+          <span class="nav-icon">□</span>
           <span>Projetos</span>
         </button>
 
         <button data-view="history" type="button">
-          <span>◷</span>
+          <span class="nav-icon">◷</span>
           <span>Histórico</span>
         </button>
 
         <button data-view="plans" type="button">
-          <span>▣</span>
+          <span class="nav-icon">▭</span>
           <span>Planos</span>
         </button>
 
         <button data-view="settings" type="button">
-          <span>⚙</span>
+          <span class="nav-icon">⚙</span>
           <span>Configurações</span>
         </button>
 
@@ -145,36 +134,20 @@
       <div class="side-user">
 
         <div class="user-message-avatar">
-          U
+          <span id="sideUserLetter">U</span>
         </div>
 
         <div class="side-user-info">
-
-          <strong id="userName">
-            Usuário
-          </strong>
-
-          <span>
-            Conta VÉRTEX
-          </span>
-
+          <strong id="userName">Usuário</strong>
+          <span>Conta VÉRTEX</span>
         </div>
-
-        <button
-          class="logout-mini"
-          onclick="logout()"
-          title="Sair"
-        >
-          ↪
-        </button>
 
       </div>
 
     </aside>
 
 
-    <!-- ÁREA PRINCIPAL -->
-
+    <!-- CONTEÚDO -->
     <main class="main">
 
       <header class="topbar">
@@ -182,43 +155,26 @@
         <button
           class="mobile-menu"
           type="button"
-          onclick="document.body.classList.toggle('menu-open')"
+          onclick="toggleMenu()"
+          aria-label="Menu"
         >
           ☰
         </button>
 
-        <div class="topbar-brand">
+        <div class="top-title">
 
-          <div class="topbar-mark">
-            <svg viewBox="0 0 100 100">
-              <path d="M14 10h27l9 17 9-17h27L50 90 14 10z"/>
-            </svg>
-          </div>
+          <h1 id="title">VÉRTEX AI</h1>
 
-          <div>
-
-            <strong>VÉRTEX AI</strong>
-
-            <span>
-              Especialista em renda extra
-            </span>
-
-          </div>
+          <p id="sub" class="muted">
+            Especialista em renda extra
+          </p>
 
         </div>
 
-        <div class="top-actions">
+        <div class="top-user">
 
-          <button
-            class="top-icon"
-            type="button"
-            onclick="openAI('')"
-          >
-            ⌕
-          </button>
-
-          <div class="top-user-avatar">
-            R
+          <div class="user-message-avatar">
+            <span id="topUserLetter">U</span>
           </div>
 
         </div>
@@ -226,66 +182,21 @@
       </header>
 
 
-      <div class="page-header">
+      <section id="dashboard" class="view"></section>
 
-        <div>
+      <section id="workspace" class="view"></section>
 
-          <h1 id="title">
-            Dashboard
-          </h1>
+      <section id="templates" class="view"></section>
 
-          <p id="sub" class="muted">
-            Seu ponto de partida para renda extra no digital.
-          </p>
+      <section id="bonuses" class="view"></section>
 
-        </div>
+      <section id="projects" class="view"></section>
 
-      </div>
+      <section id="history" class="view"></section>
 
+      <section id="plans" class="view"></section>
 
-      <div class="content">
-
-        <section
-          id="dashboard"
-          class="view"
-        ></section>
-
-        <section
-          id="workspace"
-          class="view"
-        ></section>
-
-        <section
-          id="templates"
-          class="view"
-        ></section>
-
-        <section
-          id="bonuses"
-          class="view"
-        ></section>
-
-        <section
-          id="projects"
-          class="view"
-        ></section>
-
-        <section
-          id="history"
-          class="view"
-        ></section>
-
-        <section
-          id="plans"
-          class="view"
-        ></section>
-
-        <section
-          id="settings"
-          class="view"
-        ></section>
-
-      </div>
+      <section id="settings" class="view"></section>
 
     </main>
 
