@@ -1125,7 +1125,7 @@ app.get(
           id: "FREE",
           name: "Grátis",
           price: "R$ 0",
-          credits: 30,
+          credits: 15,
           checkout: null
         },
 
