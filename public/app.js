@@ -1,318 +1,196 @@
+const META = {
+  name: "VÉRTEX AI",
+  subtitle: "Seu assistente para renda extra no digital.",
+  bonuses: "3 criativos bônus"
+};
+
 let token = localStorage.getItem("vertex_token");
 let me = null;
-let currentChatId = null;
 let plansCache = [];
-
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => document.querySelectorAll(selector);
-
-
-/* =====================================================
-   API
-===================================================== */
+let currentChatId = null;
+let currentPrompt = "";
 
 async function api(url, options = {}) {
-
-  const headers = {
-    "Content-Type": "application/json",
-    ...(options.headers || {})
+  const config = {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
   };
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
+  const response = await fetch(url, config);
 
-  const data = await response.json().catch(() => ({}));
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_) {}
 
   if (!response.ok) {
-    throw new Error(
-      data.error || "Ocorreu um erro."
-    );
+    throw new Error(data.message || data.error || "Erro na solicitação.");
   }
 
   return data;
 }
 
-
-/* =====================================================
-   AUTH
-===================================================== */
-
 function authMode(mode) {
+  const loginTab = document.getElementById("loginTab");
+  const registerTab = document.getElementById("registerTab");
+  const form = document.getElementById("authForm");
+  const error = document.getElementById("authError");
 
-  const loginTab = $("#loginTab");
-  const registerTab = $("#registerTab");
-  const form = $("#authForm");
-  const error = $("#authError");
+  if (!form) return;
 
   error.textContent = "";
 
-  loginTab.classList.toggle("on", mode === "login");
-  registerTab.classList.toggle("on", mode === "register");
-
   if (mode === "login") {
+    loginTab.classList.add("on");
+    registerTab.classList.remove("on");
 
     form.innerHTML = `
-      <form class="form" onsubmit="login(event)">
-
-        <div class="field">
-          <label>E-mail</label>
-          <input
-            id="email"
-            type="email"
-            autocomplete="email"
-            required
-            placeholder="seu@email.com"
-          >
-        </div>
-
-        <div class="field">
-          <label>Senha</label>
-          <input
-            id="password"
-            type="password"
-            autocomplete="current-password"
-            required
-            placeholder="Sua senha"
-          >
-        </div>
-
-        <button class="btn orange" type="submit">
-          Entrar no VÉRTEX
-        </button>
-
+      <form onsubmit="login(event)">
+        <input id="email" type="email" placeholder="Seu e-mail" required>
+        <input id="password" type="password" placeholder="Sua senha" required>
+        <button class="primary full" type="submit">Entrar</button>
       </form>
     `;
-
   } else {
+    loginTab.classList.remove("on");
+    registerTab.classList.add("on");
 
     form.innerHTML = `
-      <form class="form" onsubmit="register(event)">
-
-        <div class="field">
-          <label>Nome</label>
-          <input
-            id="name"
-            type="text"
-            autocomplete="name"
-            required
-            placeholder="Seu nome"
-          >
-        </div>
-
-        <div class="field">
-          <label>E-mail</label>
-          <input
-            id="email"
-            type="email"
-            autocomplete="email"
-            required
-            placeholder="seu@email.com"
-          >
-        </div>
-
-        <div class="field">
-          <label>Senha</label>
-          <input
-            id="password"
-            type="password"
-            autocomplete="new-password"
-            minlength="6"
-            required
-            placeholder="Mínimo de 6 caracteres"
-          >
-        </div>
-
-        <button class="btn orange" type="submit">
-          Criar minha conta
-        </button>
-
+      <form onsubmit="register(event)">
+        <input id="name" type="text" placeholder="Seu nome" required>
+        <input id="email" type="email" placeholder="Seu e-mail" required>
+        <input id="password" type="password" placeholder="Crie uma senha" required>
+        <button class="primary full" type="submit">Criar conta</button>
       </form>
     `;
   }
 }
-
 
 async function login(event) {
-
   event.preventDefault();
 
-  const error = $("#authError");
+  const error = document.getElementById("authError");
+  error.textContent = "";
 
   try {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
 
-    const email = $("#email").value.trim();
-    const password = $("#password").value;
-
-    const data = await api(
-      "/api/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email,
-          password
-        })
-      }
-    );
+    const data = await api("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        password
+      })
+    });
 
     token = data.token;
-
-    localStorage.setItem(
-      "vertex_token",
-      token
-    );
-
-    me = data.user;
+    localStorage.setItem("vertex_token", token);
 
     await start();
-
   } catch (err) {
-
     error.textContent = err.message;
   }
 }
-
 
 async function register(event) {
-
   event.preventDefault();
 
-  const error = $("#authError");
+  const error = document.getElementById("authError");
+  error.textContent = "";
 
   try {
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
 
-    const name = $("#name").value.trim();
-    const email = $("#email").value.trim();
-    const password = $("#password").value;
-
-    const data = await api(
-      "/api/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          email,
-          password
-        })
-      }
-    );
+    const data = await api("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        email,
+        password
+      })
+    });
 
     token = data.token;
-
-    localStorage.setItem(
-      "vertex_token",
-      token
-    );
-
-    me = data.user;
+    localStorage.setItem("vertex_token", token);
 
     await start();
-
   } catch (err) {
-
     error.textContent = err.message;
   }
 }
 
-
-/* =====================================================
-   START
-===================================================== */
-
 async function start() {
-
-  if (!token) {
-
-    $("#auth").classList.remove("hidden");
-    $("#app").classList.add("hidden");
-
-    authMode("login");
-
-    return;
-  }
-
   try {
+    me = await api("/api/me");
 
-    const data = await api("/api/me");
+    if (!me) {
+      logout();
+      return;
+    }
 
-    me = data.user;
+    document.getElementById("auth").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
 
-    $("#auth").classList.add("hidden");
-    $("#app").classList.remove("hidden");
-
-    updateUser();
+    const userName = document.getElementById("userName");
+    if (userName) {
+      userName.textContent = me.name || "Usuário";
+    }
 
     await loadPlans();
 
     renderAll();
 
-    await workspace();
-
     show("workspace");
-
-  } catch {
-
-    token = null;
+  } catch (err) {
+    console.error(err);
 
     localStorage.removeItem("vertex_token");
+    token = null;
+    me = null;
 
-    $("#auth").classList.remove("hidden");
-    $("#app").classList.add("hidden");
+    document.getElementById("auth").classList.remove("hidden");
+    document.getElementById("app").classList.add("hidden");
 
     authMode("login");
   }
 }
 
-
-function updateUser() {
-
-  if (!me) return;
-
-  const name = me.name || "Usuário";
-  const letter = name.charAt(0).toUpperCase();
-
-  if ($("#userName")) {
-    $("#userName").textContent = name;
-  }
-
-  if ($("#sideUserLetter")) {
-    $("#sideUserLetter").textContent = letter;
-  }
-
-  if ($("#topUserLetter")) {
-    $("#topUserLetter").textContent = letter;
+async function loadPlans() {
+  try {
+    const data = await api("/api/plans");
+    plansCache = data.plans || [];
+  } catch (err) {
+    console.error("Erro carregando planos:", err);
+    plansCache = [];
   }
 }
 
-
-/* =====================================================
-   NAVEGAÇÃO
-===================================================== */
-
 function show(view) {
+  document.querySelectorAll(".view").forEach(section => {
+    section.classList.remove("active");
+  });
 
-  $$(".view").forEach(
-    el => el.classList.remove("on")
-  );
-
-  const target = $(`#${view}`);
+  const target = document.getElementById(view);
 
   if (target) {
-    target.classList.add("on");
+    target.classList.add("active");
   }
 
-  $$(".side nav button").forEach(button => {
-
+  document.querySelectorAll(".side nav button").forEach(button => {
     button.classList.toggle(
       "active",
       button.dataset.view === view
     );
-
   });
 
   const titles = {
@@ -321,28 +199,28 @@ function show(view) {
       "Seu ponto de partida para renda extra no digital."
     ],
     workspace: [
-      "VÉRTEX AI",
-      "Especialista em renda extra."
+      "VÉRTEX IA",
+      "Converse com seu assistente."
     ],
     templates: [
       "Ferramentas",
-      "Use ferramentas rápidas para acelerar suas ideias."
+      "Use recursos rápidos para criar conteúdo."
     ],
     bonuses: [
       "Bônus",
-      "Materiais prontos para você começar."
+      "Seus criativos disponíveis."
     ],
     projects: [
       "Projetos",
-      "Organize seus projetos no VÉRTEX."
+      "Organize seus projetos."
     ],
     history: [
       "Histórico",
-      "Suas conversas anteriores."
+      "Veja suas conversas anteriores."
     ],
     plans: [
       "Planos",
-      "Escolha o plano que combina com seu uso."
+      "Escolha os recursos que deseja utilizar."
     ],
     settings: [
       "Configurações",
@@ -350,1049 +228,1000 @@ function show(view) {
     ]
   };
 
-  if (titles[view]) {
+  const info = titles[view] || titles.workspace;
 
-    $("#title").textContent =
-      titles[view][0];
+  const title = document.getElementById("title");
+  const sub = document.getElementById("sub");
 
-    $("#sub").textContent =
-      titles[view][1];
-  }
+  if (title) title.textContent = info[0];
+  if (sub) sub.textContent = info[1];
 
   document.body.classList.remove("menu-open");
+
+  if (view === "bonuses") loadBonuses();
+  if (view === "projects") loadProjects();
+  if (view === "history") loadHistory();
 }
 
-
-function bindNavigation() {
-
-  $$(".side nav button").forEach(button => {
-
-    button.onclick = async () => {
-
-      const view = button.dataset.view;
-
-      show(view);
-
-      if (view === "dashboard") dashboard();
-      if (view === "workspace") await workspace();
-      if (view === "templates") templates();
-      if (view === "bonuses") loadBonuses();
-      if (view === "projects") loadProjects();
-      if (view === "history") loadHistory();
-      if (view === "plans") plans();
-      if (view === "settings") settings();
-    };
-
+document.querySelectorAll(".side nav button").forEach(button => {
+  button.addEventListener("click", () => {
+    show(button.dataset.view);
   });
-}
+});
 
-
-function toggleMenu() {
-  document.body.classList.toggle("menu-open");
-}
-
-
-/* =====================================================
-   CHAT
-===================================================== */
-
-function vertexLogo() {
+function dashboard() {
+  const credits = Number(me?.credits ?? 15);
+  const bonusUsed = Number(me?.bonus_used ?? 0);
+  const bonusRemaining = Math.max(0, 3 - bonusUsed);
 
   return `
-    <svg viewBox="0 0 100 100" aria-hidden="true">
-      <path d="
-        M14 16
-        L34 16
-        L50 48
-        L66 16
-        L86 16
-        L55 77
-        L45 77
-        Z
-      "/>
-    </svg>
-  `;
-}
+    <div class="dashboard-grid">
 
-
-async function workspace() {
-
-  const box = $("#workspace");
-
-  box.innerHTML = `
-    <div class="panel chat">
-
-      <div class="chat-head">
+      <div class="stat-card">
+        <span class="stat-icon">✦</span>
         <div>
-          <strong>VÉRTEX AI</strong>
-          <span>Especialista em marketing e renda extra</span>
+          <small>Créditos da IA</small>
+          <strong>${credits}</strong>
         </div>
       </div>
 
-      <div id="messages" class="messages"></div>
+      <div class="stat-card">
+        <span class="stat-icon">◆</span>
+        <div>
+          <small>Plano</small>
+          <strong>${me?.plan || "FREE"}</strong>
+        </div>
+      </div>
 
-      <div class="composer">
+      <div class="stat-card">
+        <span class="stat-icon">🎁</span>
+        <div>
+          <small>Bônus disponíveis</small>
+          <strong>${bonusRemaining}/3</strong>
+        </div>
+      </div>
 
-        <div class="plus-wrap">
+    </div>
 
-          <button
-            id="plusButton"
-            class="plus-button"
-            type="button"
-            onclick="togglePlusMenu()"
-          >
-            +
-          </button>
+    <div class="welcome-card">
+      <div>
+        <span class="eyebrow">VÉRTEX AI</span>
+        <h2>Comece sua jornada no digital.</h2>
+        <p>
+          Use a inteligência artificial para criar ideias,
+          conteúdos, anúncios, estratégias e projetos.
+        </p>
 
-          <div
-            id="plusMenu"
-            class="plus-menu hidden"
-          >
+        <button class="primary" onclick="show('workspace')">
+          Abrir VÉRTEX IA
+        </button>
+      </div>
 
-            <button
-              class="plus-option"
-              onclick="openPlus('projects')"
-            >
-              <span>□</span>
-              <span>Projetos</span>
+      <div class="welcome-mark">V</div>
+    </div>
+
+    <div class="section-head">
+      <div>
+        <h2>Acesso rápido</h2>
+        <p>Escolha uma tarefa para começar.</p>
+      </div>
+    </div>
+
+    <div class="quick-grid">
+
+      <button class="quick-card" onclick="openAI('Comece do zero comigo e me ensine como começar a trabalhar com renda extra no digital.')">
+        <span>🚀</span>
+        <strong>Começar do zero</strong>
+        <small>Aprenda os primeiros passos.</small>
+      </button>
+
+      <button class="quick-card" onclick="openAI('Crie um criativo completo para um produto de renda extra, com gancho, texto, título e CTA.')">
+        <span>🎯</span>
+        <strong>Criar criativo</strong>
+        <small>Monte uma ideia de anúncio.</small>
+      </button>
+
+      <button class="quick-card" onclick="openAI('Crie 7 ideias de posts para Instagram no nicho de renda extra.')">
+        <span>📱</span>
+        <strong>Posts para Instagram</strong>
+        <small>Tenha conteúdo para publicar.</small>
+      </button>
+
+      <button class="quick-card" onclick="openAI('Crie uma estratégia simples de vendas para começar no digital usando apenas o celular.')">
+        <span>💡</span>
+        <strong>Estratégia</strong>
+        <small>Planeje seus próximos passos.</small>
+      </button>
+
+    </div>
+  `;
+}
+
+function workspace() {
+  const section = document.getElementById("workspace");
+
+  section.innerHTML = `
+    <div class="chat-shell">
+
+      <div class="chat-top">
+        <div class="assistant-profile">
+          <div class="vertex-avatar">V</div>
+
+          <div>
+            <strong>VÉRTEX AI</strong>
+            <span>Especialista em renda extra</span>
+          </div>
+        </div>
+
+        <button class="chat-new" onclick="newChat()" title="Nova conversa">
+          ＋
+        </button>
+      </div>
+
+      <div id="chatMessages" class="chat-messages">
+
+        <div id="chatWelcome" class="chat-welcome">
+
+          <div class="big-vertex">V</div>
+
+          <h2>Como posso ajudar?</h2>
+
+          <p>
+            Converse comigo sobre renda extra,
+            marketing digital, vendas, conteúdo e estratégias.
+          </p>
+
+          <div class="chat-suggestions">
+
+            <button onclick="openAI('Me ensine como começar no digital do zero.')">
+              Começar do zero
             </button>
 
-            <button
-              class="plus-option"
-              onclick="openPlus('history')"
-            >
-              <span>◷</span>
-              <span>Histórico</span>
+            <button onclick="openAI('Crie um criativo para vender um produto de renda extra.')">
+              Criar criativo
             </button>
 
-            <button
-              class="plus-option"
-              onclick="openPlus('plans')"
-            >
-              <span>▭</span>
-              <span>Planos</span>
+            <button onclick="openAI('Crie 7 ideias de posts para Instagram.')">
+              Criar posts
             </button>
 
-            <button
-              class="plus-option"
-              onclick="openPlus('settings')"
-            >
-              <span>⚙</span>
-              <span>Configurações</span>
+            <button onclick="openAI('Monte uma estratégia simples para conseguir minhas primeiras vendas.')">
+              Estratégia
             </button>
 
           </div>
 
         </div>
 
-        <textarea
-          id="prompt"
-          rows="1"
-          placeholder="Digite sua mensagem..."
-          oninput="autoResize(this)"
-          onkeydown="handlePromptKey(event)"
-        ></textarea>
+      </div>
+
+      <div class="chat-composer-wrap">
+
+        <div id="plusMenu" class="plus-menu hidden">
+
+          <button onclick="show('projects'); closePlusMenu()">
+            <span>📁</span>
+            <div>
+              <strong>Projetos</strong>
+              <small>Organize seus projetos</small>
+            </div>
+          </button>
+
+          <button onclick="show('history'); closePlusMenu()">
+            <span>🕘</span>
+            <div>
+              <strong>Histórico</strong>
+              <small>Conversas anteriores</small>
+            </div>
+          </button>
+
+          <button onclick="show('plans'); closePlusMenu()">
+            <span>💳</span>
+            <div>
+              <strong>Planos</strong>
+              <small>Veja seu plano</small>
+            </div>
+          </button>
+
+          <button onclick="show('settings'); closePlusMenu()">
+            <span>⚙️</span>
+            <div>
+              <strong>Configurações</strong>
+              <small>Gerencie sua conta</small>
+            </div>
+          </button>
+
+        </div>
+
+        <form class="chat-composer" onsubmit="sendAI(event)">
+
+          <button
+            type="button"
+            class="plus-button"
+            onclick="togglePlusMenu()"
+            title="Mais opções"
+          >
+            +
+          </button>
+
+          <input
+            id="prompt"
+            autocomplete="off"
+            placeholder="Pergunte alguma coisa..."
+          >
+
+          <button
+            type="submit"
+            class="send-button"
+            title="Enviar"
+          >
+            ↑
+          </button>
+
+        </form>
+
+        <small class="chat-disclaimer">
+          O VÉRTEX pode cometer erros. Confira informações importantes.
+        </small>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function templates() {
+  return `
+    <div class="section-head">
+      <div>
+        <h2>Ferramentas rápidas</h2>
+        <p>Escolha uma ferramenta e deixe a IA começar.</p>
+      </div>
+    </div>
+
+    <div class="tools-grid">
+
+      <button class="tool-card" onclick="openAI('Crie um anúncio completo para um produto de renda extra.')">
+        <span>🎯</span>
+        <strong>Criativo de anúncio</strong>
+        <small>Gancho, texto, título e CTA.</small>
+      </button>
+
+      <button class="tool-card" onclick="openAI('Crie uma copy de vendas persuasiva para um produto digital.')">
+        <span>✍️</span>
+        <strong>Copy</strong>
+        <small>Crie textos para vender.</small>
+      </button>
+
+      <button class="tool-card" onclick="openAI('Crie 7 posts para Instagram no nicho de renda extra.')">
+        <span>📱</span>
+        <strong>Posts</strong>
+        <small>Ideias para redes sociais.</small>
+      </button>
+
+      <button class="tool-card" onclick="openAI('Crie uma estratégia de vendas usando apenas o celular.')">
+        <span>📈</span>
+        <strong>Estratégia</strong>
+        <small>Planeje sua operação.</small>
+      </button>
+
+    </div>
+  `;
+}
+
+async function loadBonuses() {
+  const section = document.getElementById("bonuses");
+
+  section.innerHTML = `
+    <div class="loading-card">Carregando bônus...</div>
+  `;
+
+  try {
+    const data = await api("/api/bonuses");
+
+    const items = data.items || [];
+
+    section.innerHTML = `
+      <div class="section-head">
+        <div>
+          <h2>🎁 Bônus VÉRTEX</h2>
+          <p>
+            Você tem ${data.remaining ?? 0} de 3 bônus disponíveis.
+          </p>
+        </div>
+      </div>
+
+      <div class="bonus-grid">
+
+        ${
+          items.length
+            ? items.map(item => `
+              <div class="bonus-card">
+
+                <div class="bonus-icon">🎁</div>
+
+                <div class="bonus-content">
+                  <span class="eyebrow">BÔNUS</span>
+
+                  <h3>${escapeHTML(item.title || "Criativo bônus")}</h3>
+
+                  <p>
+                    ${escapeHTML(
+                      item.description ||
+                      "Use este recurso para acelerar sua criação."
+                    )}
+                  </p>
+
+                  <button
+                    class="primary"
+                    onclick="useBonus(${Number(item.id)})"
+                    ${item.used ? "disabled" : ""}
+                  >
+                    ${item.used ? "Já utilizado" : "Usar bônus"}
+                  </button>
+                </div>
+
+              </div>
+            `).join("")
+            : `
+              <div class="empty-card">
+                Nenhum bônus disponível no momento.
+              </div>
+            `
+        }
+
+      </div>
+    `;
+  } catch (err) {
+    section.innerHTML = `
+      <div class="error-card">
+        ${escapeHTML(err.message)}
+      </div>
+    `;
+  }
+}
+
+async function useBonus(id) {
+  try {
+    const data = await api(`/api/bonuses/${id}/use`, {
+      method: "POST"
+    });
+
+    if (data.user) {
+      me = data.user;
+    }
+
+    toast("Bônus utilizado!");
+
+    await loadBonuses();
+    dashboard();
+
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function loadProjects() {
+  const section = document.getElementById("projects");
+
+  section.innerHTML = `
+    <div class="section-head">
+      <div>
+        <h2>Projetos</h2>
+        <p>Guarde suas ideias e trabalhos.</p>
+      </div>
+
+      <button class="primary" onclick="newProject()">
+        + Novo projeto
+      </button>
+    </div>
+
+    <div id="projectsList" class="projects-list">
+      Carregando...
+    </div>
+  `;
+
+  try {
+    const data = await api("/api/projects");
+    const projects = data.projects || [];
+
+    const list = document.getElementById("projectsList");
+
+    if (!projects.length) {
+      list.innerHTML = `
+        <div class="empty-card">
+          <div class="empty-icon">📁</div>
+          <h3>Nenhum projeto ainda</h3>
+          <p>Crie seu primeiro projeto para começar.</p>
+          <button class="primary" onclick="newProject()">
+            Criar projeto
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = projects.map(project => `
+      <div class="project-card">
+
+        <div>
+          <span class="project-icon">📁</span>
+        </div>
+
+        <div class="project-info">
+          <h3>${escapeHTML(project.title || project.name || "Projeto")}</h3>
+
+          <p>
+            ${escapeHTML(
+              project.description ||
+              project.content ||
+              "Sem descrição."
+            )}
+          </p>
+        </div>
 
         <button
-          class="send-button"
-          type="button"
-          onclick="sendAI()"
+          class="icon-button"
+          onclick="editProject(${Number(project.id)})"
         >
-          ➤
+          ✏️
+        </button>
+
+      </div>
+    `).join("");
+
+  } catch (err) {
+    document.getElementById("projectsList").innerHTML = `
+      <div class="error-card">
+        ${escapeHTML(err.message)}
+      </div>
+    `;
+  }
+}
+
+async function newProject() {
+  const title = prompt("Nome do projeto:");
+
+  if (!title) return;
+
+  const description = prompt("Descrição do projeto:") || "";
+
+  try {
+    await api("/api/projects", {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        description
+      })
+    });
+
+    toast("Projeto criado!");
+
+    await loadProjects();
+
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function editProject(id) {
+  try {
+    const data = await api("/api/projects");
+    const project = (data.projects || []).find(
+      item => Number(item.id) === Number(id)
+    );
+
+    if (!project) {
+      toast("Projeto não encontrado.", true);
+      return;
+    }
+
+    const title = prompt(
+      "Nome do projeto:",
+      project.title || project.name || ""
+    );
+
+    if (!title) return;
+
+    const description = prompt(
+      "Descrição:",
+      project.description || project.content || ""
+    ) || "";
+
+    await api(`/api/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title,
+        description
+      })
+    });
+
+    toast("Projeto atualizado!");
+
+    await loadProjects();
+
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function loadHistory() {
+  const section = document.getElementById("history");
+
+  section.innerHTML = `
+    <div class="section-head">
+      <div>
+        <h2>Histórico</h2>
+        <p>Suas conversas anteriores.</p>
+      </div>
+    </div>
+
+    <div id="historyList" class="history-list">
+      Carregando...
+    </div>
+  `;
+
+  try {
+    const data = await api("/api/history");
+    const history = data.history || data.chats || [];
+
+    const list = document.getElementById("historyList");
+
+    if (!history.length) {
+      list.innerHTML = `
+        <div class="empty-card">
+          <div class="empty-icon">🕘</div>
+          <h3>Nenhuma conversa ainda</h3>
+          <p>Quando você conversar com a VÉRTEX, suas conversas aparecerão aqui.</p>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = history.map(item => `
+      <button
+        class="history-card"
+        onclick="openHistoryChat(${Number(item.id)})"
+      >
+
+        <div class="history-icon">✦</div>
+
+        <div>
+          <strong>
+            ${escapeHTML(item.title || "Nova conversa")}
+          </strong>
+
+          <span>
+            ${Number(item.message_count || 0)} mensagens
+          </span>
+        </div>
+
+        <span class="history-arrow">›</span>
+
+      </button>
+    `).join("");
+
+  } catch (err) {
+    document.getElementById("historyList").innerHTML = `
+      <div class="error-card">
+        ${escapeHTML(err.message)}
+      </div>
+    `;
+  }
+}
+
+async function openHistoryChat(id) {
+  try {
+    const data = await api(`/api/chats/${id}`);
+
+    currentChatId = id;
+
+    show("workspace");
+
+    const messages = document.getElementById("chatMessages");
+
+    if (!messages) return;
+
+    const list = data.messages || [];
+
+    messages.innerHTML = "";
+
+    if (!list.length) {
+      workspace();
+      return;
+    }
+
+    list.forEach(message => {
+      addMessage(
+        message.role === "user" ? "user" : "assistant",
+        message.content || message.message || ""
+      );
+    });
+
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function plans() {
+  const section = document.getElementById("plans");
+
+  const plans = plansCache || [];
+
+  section.innerHTML = `
+    <div class="section-head">
+      <div>
+        <h2>Planos</h2>
+        <p>Seu plano atual: <strong>${escapeHTML(me?.plan || "FREE")}</strong></p>
+      </div>
+    </div>
+
+    <div class="plans-grid">
+
+      ${
+        plans.length
+          ? plans.map(plan => `
+            <div class="plan-card ${plan.id === me?.plan ? "current" : ""}">
+
+              <div class="plan-head">
+                <span class="eyebrow">${escapeHTML(plan.id)}</span>
+                <h3>${escapeHTML(plan.name || plan.title || plan.id)}</h3>
+              </div>
+
+              <div class="plan-price">
+                ${
+                  plan.price
+                    ? `R$ ${escapeHTML(String(plan.price))}`
+                    : "Grátis"
+                }
+              </div>
+
+              <div class="plan-features">
+
+                <div>
+                  ✦ ${Number(plan.credits || 0)} créditos
+                </div>
+
+                <div>
+                  🎁 ${Number(plan.bonuses || 0)} bônus
+                </div>
+
+              </div>
+
+              ${
+                plan.id === me?.plan
+                  ? `
+                    <button class="secondary full" disabled>
+                      Plano atual
+                    </button>
+                  `
+                  : `
+                    <button
+                      class="primary full"
+                      onclick="checkout('${escapeHTML(plan.id)}')"
+                    >
+                      Escolher plano
+                    </button>
+                  `
+              }
+
+            </div>
+          `).join("")
+          : `
+            <div class="empty-card">
+              Não foi possível carregar os planos.
+            </div>
+          `
+      }
+
+    </div>
+  `;
+}
+
+function checkout(planId) {
+  const plan = plansCache.find(
+    item => item.id === planId
+  );
+
+  if (!plan) {
+    toast("Plano não encontrado.", true);
+    return;
+  }
+
+  if (plan.url) {
+    window.open(plan.url, "_blank");
+    return;
+  }
+
+  toast("Este plano ainda não possui checkout.");
+}
+
+function settings() {
+  const section = document.getElementById("settings");
+
+  section.innerHTML = `
+    <div class="section-head">
+      <div>
+        <h2>Configurações</h2>
+        <p>Gerencie seus dados da conta.</p>
+      </div>
+    </div>
+
+    <div class="settings-card">
+
+      <div class="settings-section">
+        <h3>Conta</h3>
+
+        <label>Nome</label>
+        <input
+          id="accountName"
+          value="${escapeAttribute(me?.name || "")}"
+        >
+
+        <label>E-mail</label>
+        <input
+          id="accountEmail"
+          type="email"
+          value="${escapeAttribute(me?.email || "")}"
+        >
+
+        <button class="primary" onclick="saveAccount()">
+          Salvar alterações
+        </button>
+      </div>
+
+      <div class="settings-section danger-section">
+
+        <h3>Sessão</h3>
+
+        <button class="danger" onclick="logout()">
+          Sair da conta
         </button>
 
       </div>
 
     </div>
   `;
-
-  if (!currentChatId) {
-
-    const chats = await api("/api/chats");
-
-    if (chats.chats.length) {
-
-      currentChatId =
-        chats.chats[0].id;
-
-      await loadChat(currentChatId);
-
-    } else {
-
-      await newChat(true);
-    }
-
-  } else {
-
-    await loadChat(currentChatId);
-  }
-
-  addSuggestions();
 }
 
+async function saveAccount() {
+  try {
+    const name = document.getElementById("accountName").value.trim();
+    const email = document.getElementById("accountEmail").value.trim();
 
-function addSuggestions() {
-
-  const messages = $("#messages");
-
-  if (!messages) return;
-
-  if (messages.dataset.suggestions) return;
-
-  const suggestions = document.createElement("div");
-
-  suggestions.className = "suggestions-row";
-
-  suggestions.innerHTML = `
-    <button class="quick" onclick="usePrompt('Começar do zero')">
-      Começar do zero
-    </button>
-
-    <button class="quick" onclick="usePrompt('Criar um criativo para anúncio')">
-      Criativo
-    </button>
-
-    <button class="quick" onclick="usePrompt('Criar ideias de posts para Instagram')">
-      Posts
-    </button>
-
-    <button class="quick" onclick="usePrompt('Criar uma copy para vender')">
-      Copy
-    </button>
-
-    <button class="quick" onclick="usePrompt('Criar uma estratégia de vendas')">
-      Estratégia
-    </button>
-  `;
-
-  messages.appendChild(suggestions);
-
-  messages.dataset.suggestions = "1";
-}
-
-
-function usePrompt(text) {
-
-  const input = $("#prompt");
-
-  if (!input) return;
-
-  input.value = text;
-
-  autoResize(input);
-
-  input.focus();
-}
-
-
-function handlePromptKey(event) {
-
-  if (
-    event.key === "Enter" &&
-    !event.shiftKey
-  ) {
-
-    event.preventDefault();
-
-    sendAI();
-  }
-}
-
-
-function autoResize(textarea) {
-
-  textarea.style.height = "auto";
-
-  textarea.style.height =
-    Math.min(textarea.scrollHeight, 150) + "px";
-}
-
-
-/* =====================================================
-   NOVA CONVERSA
-===================================================== */
-
-async function newChat(silent = false) {
-
-  const data = await api(
-    "/api/chats",
-    {
-      method: "POST",
+    const data = await api("/api/account", {
+      method: "PUT",
       body: JSON.stringify({
-        title: "Nova conversa"
+        name,
+        email
       })
-    }
-  );
+    });
 
-  currentChatId = data.chat.id;
+    me = data.user || data;
 
-  if (!silent) {
+    document.getElementById("userName").textContent =
+      me.name || "Usuário";
 
-    show("workspace");
+    toast("Conta atualizada!");
 
-    await workspace();
+  } catch (err) {
+    toast(err.message, true);
   }
 }
 
+function renderAll() {
+  document.getElementById("dashboard").innerHTML = dashboard();
+  document.getElementById("workspace").innerHTML = "";
+  document.getElementById("templates").innerHTML = templates();
+  document.getElementById("bonuses").innerHTML = "";
+  document.getElementById("projects").innerHTML = "";
+  document.getElementById("history").innerHTML = "";
+  document.getElementById("plans").innerHTML = "";
+  document.getElementById("settings").innerHTML = "";
 
-/* =====================================================
-   CARREGAR CHAT
-===================================================== */
-
-async function loadChat(id) {
-
-  const data =
-    await api(`/api/chats/${id}`);
-
-  const messages = $("#messages");
-
-  if (!messages) return;
-
-  messages.innerHTML = "";
-
-  data.messages.forEach(message => {
-
-    renderMessage(
-      message.role,
-      message.content
-    );
-
-  });
-
-  if (!data.messages.length) {
-
-    renderMessage(
-      "assistant",
-      `Olá! 👋
-
-Como posso te ajudar hoje?
-
-Estou aqui para te orientar em marketing digital, conteúdo, vendas online, afiliados e estratégias para renda extra.`
-    );
-  }
-
-  scrollMessages();
+  workspace();
+  plans();
+  settings();
 }
 
+function openAI(text) {
+  show("workspace");
 
-function renderMessage(role, content) {
+  const input = document.getElementById("prompt");
 
-  const messages = $("#messages");
-
-  if (!messages) return;
-
-  const row =
-    document.createElement("div");
-
-  row.className =
-    role === "user"
-      ? "message-row message-user"
-      : "message-row message-vertex";
-
-  if (role === "assistant") {
-
-    row.innerHTML = `
-      <div class="vertex-avatar">
-        ${vertexLogo()}
-      </div>
-
-      <div class="message-bubble">
-        <div class="message-name">
-          VÉRTEX AI
-        </div>
-
-        <div class="message-text"></div>
-      </div>
-    `;
-
-  } else {
-
-    const letter =
-      (me?.name || "U")
-        .charAt(0)
-        .toUpperCase();
-
-    row.innerHTML = `
-      <div class="message-bubble">
-        <div class="message-text"></div>
-      </div>
-
-      <div class="user-message-avatar">
-        ${letter}
-      </div>
-    `;
+  if (input) {
+    input.value = text;
+    input.focus();
   }
-
-  const text =
-    row.querySelector(".message-text");
-
-  text.textContent = content;
-
-  messages.appendChild(row);
 }
 
+function setPrompt(text) {
+  const input = document.getElementById("prompt");
 
-async function sendAI() {
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+}
 
-  const input = $("#prompt");
+async function sendAI(event) {
+  event.preventDefault();
 
-  if (!input) return;
+  const input = document.getElementById("prompt");
+  const messages = document.getElementById("chatMessages");
 
-  const prompt =
-    input.value.trim();
+  if (!input || !messages) return;
 
-  if (!prompt) return;
+  const promptText = input.value.trim();
+
+  if (!promptText) return;
 
   input.value = "";
 
-  autoResize(input);
+  const welcome = document.getElementById("chatWelcome");
 
-  document
-    .querySelector(".suggestions-row")
-    ?.remove();
-
-  renderMessage(
-    "user",
-    prompt
-  );
-
-  scrollMessages();
-
-  const loading =
-    document.createElement("div");
-
-  loading.className =
-    "message-row message-vertex";
-
-  loading.innerHTML = `
-    <div class="vertex-avatar">
-      ${vertexLogo()}
-    </div>
-
-    <div class="message-bubble">
-      <div class="message-name">VÉRTEX AI</div>
-      <div class="message-text">Pensando...</div>
-    </div>
-  `;
-
-  $("#messages").appendChild(loading);
-
-  scrollMessages();
-
-  try {
-
-    const data =
-      await api(
-        "/api/ai/generate",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            chatId: currentChatId,
-            prompt
-          })
-        }
-      );
-
-    loading.remove();
-
-    renderMessage(
-      "assistant",
-      data.message
-    );
-
-  } catch (error) {
-
-    loading.remove();
-
-    renderMessage(
-      "assistant",
-      "Não consegui responder agora. Tente novamente em alguns segundos."
-    );
-
+  if (welcome) {
+    welcome.remove();
   }
 
-  scrollMessages();
+  addMessage("user", promptText);
+
+  const loading = addMessage(
+    "assistant",
+    "Pensando..."
+  );
+
+  try {
+    const data = await api("/api/ai/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        chatId: currentChatId,
+        prompt: promptText
+      })
+    });
+
+    if (data.chatId) {
+      currentChatId = data.chatId;
+    }
+
+    if (data.user) {
+      me = data.user;
+
+      const userName = document.getElementById("userName");
+
+      if (userName) {
+        userName.textContent = me.name || "Usuário";
+      }
+    }
+
+    loading.remove();
+
+    addMessage(
+      "assistant",
+      data.response ||
+      data.message ||
+      "Não consegui gerar uma resposta agora."
+    );
+
+  } catch (err) {
+    loading.remove();
+
+    addMessage(
+      "assistant",
+      `Não consegui responder agora.\n\n${err.message}`
+    );
+  }
 }
 
+function addMessage(role, text) {
+  const messages = document.getElementById("chatMessages");
 
-function scrollMessages() {
+  if (!messages) return null;
 
-  const box = $("#messages");
+  const row = document.createElement("div");
+  row.className = `message-row ${role}`;
 
-  if (!box) return;
+  const avatar = document.createElement("div");
+  avatar.className =
+    role === "assistant"
+      ? "message-avatar vertex-avatar"
+      : "message-avatar user-message-avatar";
 
-  requestAnimationFrame(() => {
+  avatar.textContent =
+    role === "assistant"
+      ? "V"
+      : "U";
 
-    box.scrollTop =
-      box.scrollHeight;
+  const bubble = document.createElement("div");
+  bubble.className = "message-bubble";
 
-  });
+  bubble.textContent = text;
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+
+  messages.appendChild(row);
+
+  messages.scrollTop = messages.scrollHeight;
+
+  return row;
 }
 
+function newChat() {
+  currentChatId = null;
 
-/* =====================================================
-   +
-===================================================== */
+  const section = document.getElementById("workspace");
+
+  if (!section) return;
+
+  section.innerHTML = "";
+
+  workspace();
+
+  show("workspace");
+
+  setTimeout(() => {
+    const input = document.getElementById("prompt");
+
+    if (input) {
+      input.focus();
+    }
+  }, 100);
+}
 
 function togglePlusMenu() {
-
-  const menu =
-    $("#plusMenu");
+  const menu = document.getElementById("plusMenu");
 
   if (!menu) return;
 
   menu.classList.toggle("hidden");
 }
 
-
-function openPlus(view) {
-
-  $("#plusMenu")?.classList.add("hidden");
-
-  show(view);
-
-  if (view === "projects") loadProjects();
-  if (view === "history") loadHistory();
-  if (view === "plans") plans();
-  if (view === "settings") settings();
-}
-
-
-/* =====================================================
-   DASHBOARD
-===================================================== */
-
-function dashboard() {
-
-  $("#dashboard").innerHTML = `
-    <div class="page">
-
-      <div class="page-inner">
-
-        <h1>Olá, ${me?.name || "Usuário"} 👋</h1>
-
-        <p class="page-subtitle">
-          Seu ponto de partida para renda extra no digital.
-        </p>
-
-        <div class="cards">
-
-          <div class="card">
-            <div class="small muted">Créditos da IA</div>
-            <h2>${me?.credits ?? 30}</h2>
-          </div>
-
-          <div class="card">
-            <div class="small muted">Plano</div>
-            <h2>${me?.plan || "FREE"}</h2>
-          </div>
-
-          <div class="card">
-            <div class="small muted">Especialidade</div>
-            <h2>RENDA</h2>
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-/* =====================================================
-   FERRAMENTAS
-===================================================== */
-
-function templates() {
-
-  $("#templates").innerHTML = `
-    <div class="page">
-
-      <div class="page-inner">
-
-        <h1>Ferramentas</h1>
-
-        <p class="page-subtitle">
-          Atalhos para acelerar seu trabalho digital.
-        </p>
-
-        <div class="grid">
-
-          <button class="quick"
-            onclick="openTool('Começar do zero')">
-            <strong>Começar do zero</strong>
-            <div class="small muted">
-              Monte uma estratégia desde o início.
-            </div>
-          </button>
-
-          <button class="quick"
-            onclick="openTool('Criar um criativo para anúncio')">
-            <strong>Criativo</strong>
-            <div class="small muted">
-              Ideias de anúncios e ganchos.
-            </div>
-          </button>
-
-          <button class="quick"
-            onclick="openTool('Criar ideias de posts para Instagram')">
-            <strong>Posts</strong>
-            <div class="small muted">
-              Conteúdo para redes sociais.
-            </div>
-          </button>
-
-          <button class="quick"
-            onclick="openTool('Criar uma copy para vender')">
-            <strong>Copy</strong>
-            <div class="small muted">
-              Textos focados em conversão.
-            </div>
-          </button>
-
-          <button class="quick"
-            onclick="openTool('Criar uma estratégia de vendas')">
-            <strong>Estratégia</strong>
-            <div class="small muted">
-              Planejamento de vendas.
-            </div>
-          </button>
-
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-function openTool(text) {
-
-  show("workspace");
-
-  workspace().then(() => {
-    usePrompt(text);
-  });
-}
-
-
-/* =====================================================
-   BÔNUS
-===================================================== */
-
-async function loadBonuses() {
-
-  $("#bonuses").innerHTML = `
-    <div class="page">
-      <div class="page-inner">
-        <h1>Bônus</h1>
-
-        <p class="page-subtitle">
-          Materiais extras do VÉRTEX.
-        </p>
-
-        <div class="cards">
-
-          <div class="card">
-            <h3>6 criativos bônus</h3>
-            <p class="muted">
-              Criativos prontos para adaptar às suas campanhas.
-            </p>
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-
-
-/* =====================================================
-   PROJETOS
-===================================================== */
-
-async function loadProjects() {
-
-  try {
-
-    const data =
-      await api("/api/projects");
-
-    $("#projects").innerHTML = `
-      <div class="page">
-
-        <div class="page-inner">
-
-          <div class="row">
-            <div>
-              <h1>Projetos</h1>
-              <p class="page-subtitle">
-                Organize seus projetos.
-              </p>
-            </div>
-
-            <button
-              class="btn orange"
-              onclick="createProject()"
-            >
-              + Novo projeto
-            </button>
-          </div>
-
-          <div id="projectList"></div>
-
-        </div>
-
-      </div>
-    `;
-
-    const list =
-      $("#projectList");
-
-    if (!data.projects.length) {
-
-      list.innerHTML = `
-        <div class="card" style="margin-top:20px">
-          <strong>Nenhum projeto ainda.</strong>
-          <p class="muted">
-            Crie seu primeiro projeto.
-          </p>
-        </div>
-      `;
-
-      return;
-    }
-
-    data.projects.forEach(project => {
-
-      const item =
-        document.createElement("div");
-
-      item.className = "listitem";
-
-      item.innerHTML = `
-        <div>
-          <strong>${escapeHtml(project.title)}</strong>
-          <div class="small muted">
-            ${escapeHtml(project.description || "Sem descrição")}
-          </div>
-        </div>
-
-        <span class="badge">
-          ${escapeHtml(project.status || "Ativo")}
-        </span>
-      `;
-
-      list.appendChild(item);
-    });
-
-  } catch (error) {
-
-    toast(error.message);
+function closePlusMenu() {
+  const menu = document.getElementById("plusMenu");
+
+  if (menu) {
+    menu.classList.add("hidden");
   }
 }
-
-
-async function createProject() {
-
-  const title =
-    prompt("Nome do projeto:");
-
-  if (!title) return;
-
-  const description =
-    prompt("Descrição do projeto:") || "";
-
-  await api(
-    "/api/projects",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        title,
-        description
-      })
-    }
-  );
-
-  loadProjects();
-}
-
-
-/* =====================================================
-   HISTÓRICO
-===================================================== */
-
-async function loadHistory() {
-
-  try {
-
-    const data =
-      await api("/api/history");
-
-    $("#history").innerHTML = `
-      <div class="page">
-
-        <div class="page-inner">
-
-          <h1>Histórico</h1>
-
-          <p class="page-subtitle">
-            Suas conversas anteriores.
-          </p>
-
-          <div id="historyList"></div>
-
-        </div>
-
-      </div>
-    `;
-
-    const list =
-      $("#historyList");
-
-    if (!data.history.length) {
-
-      list.innerHTML = `
-        <div class="card" style="margin-top:20px">
-          Nenhuma conversa ainda.
-        </div>
-      `;
-
-      return;
-    }
-
-    data.history.forEach(item => {
-
-      const el =
-        document.createElement("button");
-
-      el.className =
-        "listitem";
-
-      el.style.width = "100%";
-      el.style.textAlign = "left";
-
-      el.innerHTML = `
-        <div>
-          <strong>
-            ${escapeHtml(item.title)}
-          </strong>
-
-          <div class="small muted">
-            ${item.message_count} mensagens
-          </div>
-        </div>
-
-        <span>›</span>
-      `;
-
-      el.onclick = async () => {
-
-        currentChatId = item.id;
-
-        show("workspace");
-
-        await workspace();
-      };
-
-      list.appendChild(el);
-    });
-
-  } catch (error) {
-
-    toast(error.message);
-  }
-}
-
-
-/* =====================================================
-   PLANOS
-===================================================== */
-
-async function loadPlans() {
-
-  try {
-
-    const data =
-      await api("/api/plans");
-
-    plansCache =
-      data.plans || [];
-
-  } catch {
-
-    plansCache = [];
-  }
-}
-
-
-function plans() {
-
-  $("#plans").innerHTML = `
-    <div class="page">
-
-      <div class="page-inner">
-
-        <h1>Planos</h1>
-
-        <p class="page-subtitle">
-          Escolha seu plano VÉRTEX.
-        </p>
-
-        <div class="plans">
-
-          ${plansCache.map(plan => `
-
-            <div class="card price ${
-              plan.id === "PRO"
-                ? "featured"
-                : ""
-            }">
-
-              <h3>
-                ${escapeHtml(plan.name)}
-              </h3>
-
-              <div class="price-value">
-                ${escapeHtml(plan.price)}
-              </div>
-
-              <p>
-                ${plan.credits} créditos
-              </p>
-
-              ${
-                plan.checkout
-                  ? `
-                    <button
-                      class="btn orange"
-                      onclick="checkout('${plan.id}')"
-                    >
-                      Escolher plano
-                    </button>
-                  `
-                  : `
-                    <button
-                      class="btn"
-                      disabled
-                    >
-                      Plano atual
-                    </button>
-                  `
-              }
-
-            </div>
-
-          `).join("")}
-
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-function checkout(id) {
-
-  const plan =
-    plansCache.find(
-      item => item.id === id
-    );
-
-  if (!plan || !plan.checkout) return;
-
-  window.open(
-    plan.checkout,
-    "_blank"
-  );
-}
-
-
-/* =====================================================
-   CONFIGURAÇÕES
-===================================================== */
-
-function settings() {
-
-  $("#settings").innerHTML = `
-    <div class="page">
-
-      <div class="page-inner">
-
-        <h1>Configurações</h1>
-
-        <p class="page-subtitle">
-          Informações da sua conta.
-        </p>
-
-        <div class="panel">
-
-          <div class="form">
-
-            <div class="field">
-              <label>Nome</label>
-              <input
-                value="${escapeHtml(me?.name || "")}"
-                disabled
-              >
-            </div>
-
-            <div class="field">
-              <label>E-mail</label>
-              <input
-                value="${escapeHtml(me?.email || "")}"
-                disabled
-              >
-            </div>
-
-            <button
-              class="btn"
-              onclick="logout()"
-            >
-              Sair da conta
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-/* =====================================================
-   LOGOUT
-===================================================== */
 
 function logout() {
+  localStorage.removeItem("vertex_token");
 
   token = null;
   me = null;
   currentChatId = null;
 
-  localStorage.removeItem(
-    "vertex_token"
-  );
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("auth").classList.remove("hidden");
 
-  location.reload();
+  authMode("login");
 }
 
+function toast(message, isError = false) {
+  let box = document.getElementById("toast");
 
-/* =====================================================
-   UTILITÁRIOS
-===================================================== */
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "toast";
+    document.body.appendChild(box);
+  }
 
-function escapeHtml(value) {
+  box.textContent = message;
+  box.className = isError
+    ? "toast error-toast"
+    : "toast";
 
+  clearTimeout(window.__toastTimer);
+
+  window.__toastTimer = setTimeout(() => {
+    box.classList.add("hidden");
+  }, 2800);
+
+  box.classList.remove("hidden");
+}
+
+function escapeHTML(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -1401,62 +1230,32 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-
-function toast(message) {
-
-  const old =
-    document.querySelector(".toast");
-
-  old?.remove();
-
-  const el =
-    document.createElement("div");
-
-  el.className = "toast";
-
-  el.textContent = message;
-
-  document.body.appendChild(el);
-
-  setTimeout(() => {
-    el.remove();
-  }, 3000);
+function escapeAttribute(value) {
+  return escapeHTML(value);
 }
 
-
-/* =====================================================
-   RENDER
-===================================================== */
-
-function renderAll() {
-
-  dashboard();
-
-  templates();
-
-  loadBonuses();
-
-  loadProjects();
-
-  loadHistory();
-
-  plans();
-
-  settings();
-
-  bindNavigation();
-}
-
-
-/* =====================================================
-   INÍCIO
-===================================================== */
-
-document.addEventListener(
-  "DOMContentLoaded",
-  () => {
-
-    start();
-
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closePlusMenu();
   }
-);
+});
+
+document.addEventListener("click", event => {
+  const menu = document.getElementById("plusMenu");
+  const plus = document.querySelector(".plus-button");
+
+  if (!menu || !plus) return;
+
+  if (
+    !menu.contains(event.target) &&
+    !plus.contains(event.target)
+  ) {
+    closePlusMenu();
+  }
+});
+
+authMode("login");
+
+if (token) {
+  start();
+}
