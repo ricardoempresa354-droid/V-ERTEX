@@ -1,36 +1,42 @@
+/* =========================================================
+   VÉRTEX AI — INTERFACE
+   Layout inspirado em assistentes de IA modernos
+========================================================= */
+
 * {
   box-sizing: border-box;
 }
 
 :root {
   --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-soft: #f7f7f8;
+  --border: #e5e5e5;
   --text: #171717;
   --muted: #737373;
-  --border: #e5e5e5;
-  --soft: #f7f7f8;
-  --user: #eeeeee;
-  --black: #171717;
+  --dark: #202123;
+  --user: #f1f1f1;
+  --ai: #f7f7f8;
 }
 
 html,
 body {
   margin: 0;
-  padding: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-
+  background: var(--bg);
+  color: var(--text);
   font-family:
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     Roboto,
-    Helvetica,
     Arial,
     sans-serif;
+}
 
-  background: #fff;
-  color: var(--text);
+body {
+  overflow: hidden;
 }
 
 button,
@@ -47,113 +53,92 @@ button {
   display: none !important;
 }
 
-.muted {
-  color: var(--muted);
-}
-
-/* =====================================================
+/* =========================================================
    LOGIN
-===================================================== */
+========================================================= */
 
 .auth {
   width: 100%;
-  height: 100%;
-  min-height: 100vh;
-
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  background: #fff;
   padding: 20px;
+  background: #fff;
 }
 
 .auth-card {
-  width: min(420px, 100%);
-  padding: 32px;
-
-  border: 1px solid #e5e5e5;
-  border-radius: 22px;
-
-  background: #fff;
-
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.06);
+  width: min(390px, 100%);
+  padding: 28px;
+  text-align: center;
 }
 
 .auth-logo {
   width: 58px;
   height: 58px;
-
   margin: 0 auto 18px;
-
+  border-radius: 17px;
+  background: #111827;
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  background: #171717;
-  color: #fff;
-
-  border-radius: 17px;
-
   font-size: 31px;
   font-weight: 900;
+  transform: skew(-4deg);
 }
 
 .auth-card h1 {
   margin: 0;
-  text-align: center;
-
-  font-size: 27px;
-  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.7px;
 }
 
 .auth-card > .muted {
   margin: 8px 0 25px;
-  text-align: center;
   font-size: 14px;
 }
 
 .auth-tabs {
+  width: 100%;
   display: flex;
-  gap: 6px;
+  gap: 5px;
+  padding: 4px;
   margin-bottom: 18px;
+  background: #f3f3f3;
+  border-radius: 12px;
 }
 
 .auth-tab {
   flex: 1;
-
   border: 0;
-  border-radius: 10px;
-
-  padding: 11px;
-
-  background: #f2f2f2;
-  color: #555;
-
+  border-radius: 9px;
+  background: transparent;
+  padding: 10px;
+  color: #666;
   font-weight: 600;
 }
 
 .auth-tab.on,
 .auth-tab.active {
-  background: #171717;
+  background: #111827;
   color: #fff;
 }
 
-.auth-form {
-  width: 100%;
+.auth .form {
+  text-align: left;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 14px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .field label {
@@ -167,16 +152,12 @@ button {
 .form input,
 .form textarea {
   width: 100%;
-
   border: 1px solid #d9d9d9;
-  border-radius: 11px;
-
-  background: #fff;
-  color: #171717;
-
-  padding: 12px 13px;
-
   outline: none;
+  background: #fff;
+  color: #111;
+  border-radius: 11px;
+  padding: 12px 13px;
 }
 
 .field input:focus,
@@ -184,29 +165,20 @@ button {
 .form input:focus,
 .form textarea:focus {
   border-color: #999;
-
-  box-shadow:
-    0 0 0 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
 }
 
 .btn {
   border: 0;
   border-radius: 10px;
-
-  padding: 11px 15px;
-
-  background: #171717;
+  padding: 10px 14px;
+  background: #202123;
   color: #fff;
-
   font-weight: 600;
 }
 
-.btn:hover {
-  opacity: 0.9;
-}
-
 .btn.orange {
-  background: #171717;
+  background: #202123;
 }
 
 .btn.ghost {
@@ -214,66 +186,67 @@ button {
   color: #222;
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .error {
   color: #c62828;
   font-size: 13px;
-  margin-bottom: 10px;
+  margin: 8px 0;
 }
 
-/* =====================================================
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 12px;
+}
+
+/* =========================================================
    APP
-===================================================== */
+========================================================= */
 
 .app {
   width: 100%;
-  height: 100vh;
-
+  height: 100dvh;
   display: flex;
-
   background: #fff;
 }
 
-/* =====================================================
+/* =========================================================
    SIDEBAR
-===================================================== */
+========================================================= */
 
 .side {
   width: 250px;
-  height: 100vh;
-
+  height: 100%;
   flex-shrink: 0;
-
-  display: flex;
-  flex-direction: column;
-
   background: #f7f7f8;
   border-right: 1px solid #e5e5e5;
-
-  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  padding: 13px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-
   gap: 10px;
-
-  padding: 7px 8px 20px;
+  padding: 8px 7px 18px;
 }
 
 .brand-mark {
   width: 38px;
   height: 38px;
-
+  border-radius: 11px;
+  background: #111827;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  border-radius: 11px;
-
-  background: #171717;
-  color: #fff;
-
   font-size: 22px;
   font-weight: 900;
 }
@@ -285,11 +258,9 @@ button {
 
 .brand span {
   display: block;
-
   margin-top: 2px;
-
-  font-size: 11px;
   color: #777;
+  font-size: 11px;
 }
 
 .side nav {
@@ -300,40 +271,37 @@ button {
 
 .side nav button {
   width: 100%;
-
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #444;
   display: flex;
   align-items: center;
-
   gap: 11px;
-
-  border: 0;
-  border-radius: 10px;
-
-  padding: 11px 12px;
-
-  background: transparent;
-  color: #555;
-
+  padding: 9px 11px;
   text-align: left;
   font-size: 14px;
 }
 
-.side nav button:hover,
-.side nav button.active {
-  background: #e9e9e9;
+.side nav button:hover {
+  background: #e9e9ea;
   color: #111;
+}
+
+.side nav button.active {
+  background: #e5e5e7;
+  color: #111;
+  font-weight: 600;
 }
 
 .side-user {
   margin-top: auto;
-
-  padding: 12px 8px;
-
-  border-top: 1px solid #e1e1e1;
-
+  border-top: 1px solid #ddd;
+  padding: 13px 5px 3px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
 }
 
 .side-user strong {
@@ -344,551 +312,386 @@ button {
 .side-user span {
   display: block;
   margin-top: 2px;
-
-  color: #888;
   font-size: 11px;
+  color: #888;
 }
 
-/* =====================================================
+/* =========================================================
    MAIN
-===================================================== */
+========================================================= */
 
 .main {
-  min-width: 0;
   flex: 1;
-
-  height: 100vh;
-
+  min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-
   background: #fff;
 }
 
-/* =====================================================
+/* =========================================================
    TOPBAR
-===================================================== */
+========================================================= */
 
 .topbar {
-  height: 68px;
-
+  height: 62px;
   flex-shrink: 0;
-
+  border-bottom: 1px solid #ededed;
   display: flex;
   align-items: center;
-
-  padding: 0 22px;
-
-  border-bottom: 1px solid #ededed;
-
-  background: #fff;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: rgba(255,255,255,0.96);
+  z-index: 20;
 }
 
 .topbar h1 {
   margin: 0;
-
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
 }
 
-.topbar p {
-  margin: 3px 0 0;
-
-  font-size: 12px;
+.topbar .muted {
+  margin: 2px 0 0;
+  font-size: 11px;
 }
 
 .mobile-menu {
-  display: none;
-
   width: 38px;
   height: 38px;
-
-  margin-right: 8px;
-
   border: 0;
   border-radius: 9px;
-
   background: transparent;
+  font-size: 22px;
+}
 
-  font-size: 23px;
+.mobile-menu:hover {
+  background: #f1f1f1;
 }
 
 .top-user {
-  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
-/* =====================================================
-   AVATAR
-===================================================== */
+/* =========================================================
+   USER AVATAR
+========================================================= */
 
 .user-message-avatar {
-  width: 32px;
-  height: 32px;
-
-  flex: 0 0 32px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-
   background: #6d28d9;
   color: #fff;
-
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.top-user .user-message-avatar {
-  width: 38px;
-  height: 38px;
-  flex-basis: 38px;
-
-  font-size: 14px;
-}
-
-.vertex-avatar {
-  width: 31px;
-  height: 31px;
-
-  flex: 0 0 31px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
-  border-radius: 50%;
-
-  background: #171717;
-
-  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
-.vertex-avatar svg {
-  width: 20px;
-  height: 20px;
-}
-
-.vertex-avatar path {
-  fill: #fff;
-}
-
-/* =====================================================
+/* =========================================================
    VIEWS
-===================================================== */
+========================================================= */
 
 .view {
   display: none;
-
-  width: 100%;
-  height: calc(100vh - 68px);
-
+  flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .view.on {
-  display: block;
+  display: flex;
 }
 
-/* =====================================================
+/* =========================================================
    CHAT
-===================================================== */
+========================================================= */
 
 #workspace.view.on {
   display: flex;
-  flex-direction: column;
 }
 
 .panel.chat {
   width: 100%;
   height: 100%;
-
-  display: flex;
-  flex-direction: column;
-
-  background: #fff;
   border: 0;
   border-radius: 0;
-  box-shadow: none;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* esconder cabeçalho duplicado do painel */
 .chat-head {
   display: none;
 }
 
-/* =====================================================
+/* =========================================================
    MENSAGENS
-===================================================== */
+========================================================= */
 
 .messages {
   flex: 1;
-
   min-height: 0;
-
+  width: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding: 30px 20px 145px;
 
-  padding: 28px 20px 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 
   scroll-behavior: smooth;
 }
 
 /*
    IMPORTANTE:
-   Não deixar nenhuma mensagem ocupar 100% da largura.
+   A linha da mensagem NÃO pode ocupar a altura
+   inteira da tela.
 */
 
 .message-row {
-  width: 100% !important;
-
-  display: flex !important;
-
-  margin: 0 0 18px !important;
-
-  padding: 0 !important;
-
-  align-items: flex-end !important;
+  width: 100%;
+  display: flex;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  align-items: flex-end;
 }
 
-/* VÉRTEX */
-.message-row.message-vertex {
-  justify-content: flex-start !important;
-}
-
-/* USUÁRIO */
 .message-row.message-user {
-  justify-content: flex-end !important;
+  justify-content: flex-end;
 }
 
-/* =====================================================
-   WRAP DA MENSAGEM
-===================================================== */
-
-.message-wrap {
-  display: flex !important;
-
-  align-items: flex-end !important;
-
-  width: auto !important;
-  max-width: 760px !important;
-
-  flex: 0 1 auto !important;
-
-  gap: 8px !important;
+.message-row.message-vertex {
+  justify-content: flex-start;
 }
 
-/* usuário invertido */
-.message-row.message-user .message-wrap {
-  flex-direction: row-reverse !important;
+/* =========================================================
+   AVATAR DA VÉRTEX
+========================================================= */
+
+.message-vertex .vertex-avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  background: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 9px;
+  flex-shrink: 0;
 }
 
-/* =====================================================
-   BOLHA
-===================================================== */
+.vertex-avatar svg {
+  width: 22px;
+  height: 22px;
+}
+
+.vertex-avatar path {
+  fill: #fff;
+}
+
+/* =========================================================
+   BOLHAS
+========================================================= */
 
 .message-bubble {
-  display: block !important;
-
+  /*
+    A correção principal:
+    nunca deixar a bolha preencher a linha inteira.
+  */
   width: auto !important;
-
-  min-width: 0 !important;
-
   height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: min(680px, 72vw) !important;
 
   flex: 0 1 auto !important;
 
-  margin: 0 !important;
+  display: inline-block;
+  padding: 11px 14px;
+  border-radius: 16px;
 
-  padding: 10px 14px !important;
+  font-size: 15px;
+  line-height: 1.48;
 
-  border-radius: 17px !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
 
-  font-size: 15px !important;
-
-  line-height: 1.48 !important;
-
-  text-align: left !important;
-
-  white-space: pre-wrap !important;
-
-  overflow-wrap: anywhere !important;
-
-  word-break: normal !important;
+  box-shadow: none;
 }
 
-/* VÉRTEX */
-.message-row.message-vertex .message-bubble {
-  max-width: min(650px, calc(100vw - 100px)) !important;
-
-  background: #f7f7f8 !important;
-
-  border: 1px solid #e7e7e7 !important;
-
-  border-bottom-left-radius: 5px !important;
+.message-vertex .message-bubble {
+  background: #f7f7f8;
+  border: 1px solid #e8e8e8;
+  border-bottom-left-radius: 5px;
 }
 
-/* USUÁRIO */
-.message-row.message-user .message-bubble {
-  max-width: min(520px, calc(100vw - 110px)) !important;
-
-  background: #eeeeee !important;
-
-  border: 0 !important;
-
-  border-bottom-right-radius: 5px !important;
+.message-user .message-bubble {
+  background: #eeeeee;
+  border: 0;
+  border-bottom-right-radius: 5px;
 }
 
-/* =====================================================
-   TEXTO
-===================================================== */
-
-.message-text {
-  display: block !important;
-
-  width: auto !important;
-
-  max-width: 100% !important;
-
-  height: auto !important;
-
-  margin: 0 !important;
-  padding: 0 !important;
-
-  text-align: left !important;
-
-  white-space: pre-wrap !important;
-
-  overflow-wrap: anywhere !important;
-
-  word-break: normal !important;
-}
+/* =========================================================
+   NOME E TEXTO
+========================================================= */
 
 .message-name {
-  margin-bottom: 4px;
-
-  color: #777;
-
-  font-size: 11px;
-  font-weight: 600;
-}
-
-/* =====================================================
-   LOADING
-===================================================== */
-
-.vertex-loading {
-  display: inline-flex;
-
-  align-items: center;
-
-  gap: 5px;
-
-  color: #888;
-
-  font-size: 13px;
-}
-
-.vertex-loading::after {
-  content: "•••";
-
-  letter-spacing: 3px;
-}
-
-/* =====================================================
-   FERRAMENTAS RÁPIDAS
-===================================================== */
-
-.tools {
-  display: flex;
-
-  gap: 8px;
-
-  padding: 0 18px 8px;
-
-  overflow-x: auto;
-
-  scrollbar-width: none;
-}
-
-.tools::-webkit-scrollbar {
   display: none;
 }
 
-.tool {
-  flex: 0 0 auto;
+.message-text {
+  width: auto !important;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
-  border: 1px solid #e1e1e1;
+/* =========================================================
+   HORA
+========================================================= */
 
-  background: #fff;
+.message-time {
+  color: #999;
+  font-size: 10px;
+  margin: 4px 4px 0;
+}
 
-  border-radius: 20px;
+/* =========================================================
+   LOADING
+========================================================= */
 
-  padding: 8px 13px;
-
-  color: #444;
-
+.vertex-loading {
+  width: auto !important;
+  max-width: 100px !important;
+  min-width: 0 !important;
+  padding: 12px 15px !important;
+  border-radius: 16px !important;
+  background: #f7f7f8;
+  color: #999;
   font-size: 13px;
-
-  white-space: nowrap;
 }
 
-.tool:hover {
-  background: #f5f5f5;
-}
-
-/* =====================================================
+/* =========================================================
    COMPOSER
-===================================================== */
+========================================================= */
 
 .composer {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  bottom: 15px;
+  transform: translateX(-50%);
 
-  width: min(820px, calc(100% - 28px));
-
-  min-height: 54px;
-
-  margin: 0 auto 15px;
+  width: min(760px, calc(100% - 30px));
+  min-height: 58px;
 
   display: flex;
   align-items: flex-end;
 
-  padding: 6px;
-
-  border: 1px solid #d8d8d8;
-
-  border-radius: 20px;
-
   background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 18px;
+
+  padding: 7px;
 
   box-shadow:
     0 4px 18px rgba(0, 0, 0, 0.06);
 
-  z-index: 20;
+  z-index: 30;
 }
 
 .composer textarea {
   flex: 1;
-
   min-width: 0;
-
-  min-height: 40px;
-
-  max-height: 140px;
+  min-height: 42px;
+  max-height: 150px;
 
   resize: none;
-
   border: 0;
-
   outline: 0;
 
   background: transparent;
-
-  padding: 10px 8px;
-
   color: #171717;
 
+  padding: 11px 9px;
   font-size: 15px;
-
   line-height: 1.4;
 }
 
 .composer textarea::placeholder {
-  color: #9b9b9b;
+  color: #999;
 }
 
-/* =====================================================
-   BOTÃO +
-===================================================== */
+/* =========================================================
+   BOTÕES DO COMPOSER
+========================================================= */
 
-.plus-button {
-  width: 40px;
-  height: 40px;
-
-  flex: 0 0 40px;
-
+.plus-button,
+.send-button {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
 
+.plus-button {
   border: 0;
-
-  border-radius: 50%;
-
-  background: #171717;
-  color: #fff;
-
+  background: transparent;
+  color: #333;
   font-size: 27px;
-
-  line-height: 1;
+  font-weight: 300;
 }
 
 .plus-button:hover {
-  background: #303030;
+  background: #f1f1f1;
 }
 
-/* =====================================================
-   ENVIAR
-===================================================== */
-
 .send-button {
-  width: 40px;
-  height: 40px;
-
-  flex: 0 0 40px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
   border: 0;
-
-  border-radius: 50%;
-
-  background: #171717;
-
+  background: #202123;
   color: #fff;
-
   font-size: 20px;
 }
 
-.send-button:hover {
-  background: #303030;
-}
-
 .send-button:disabled {
-  opacity: 0.35;
+  opacity: .35;
 }
 
-/* =====================================================
-   MENU +
-===================================================== */
-
-.plus-wrap {
-  position: relative;
-
-  flex: 0 0 auto;
-}
+/* =========================================================
+   MENU DO +
+========================================================= */
 
 .plus-menu {
   position: absolute;
 
   left: 0;
+  bottom: 55px;
 
-  bottom: 49px;
-
-  width: 210px;
+  width: 215px;
 
   padding: 6px;
 
-  border: 1px solid #dedede;
-
+  background: #fff;
+  border: 1px solid #ddd;
   border-radius: 14px;
 
-  background: #fff;
-
   box-shadow:
-    0 12px 35px rgba(0, 0, 0, 0.14);
+    0 12px 35px rgba(0,0,0,.14);
 
   z-index: 100;
 }
@@ -899,22 +702,18 @@ button {
 
 .plus-option {
   width: 100%;
+  border: 0;
+  background: transparent;
+
+  padding: 11px 12px;
+  border-radius: 9px;
 
   display: flex;
   align-items: center;
-
-  padding: 11px 12px;
-
-  border: 0;
-
-  border-radius: 9px;
-
-  background: transparent;
-
-  color: #222;
+  gap: 10px;
 
   text-align: left;
-
+  color: #222;
   font-size: 14px;
 }
 
@@ -922,9 +721,28 @@ button {
   background: #f2f2f2;
 }
 
-/* =====================================================
+/* =========================================================
+   QUICK ACTIONS
+========================================================= */
+
+.quick {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.quick::-webkit-scrollbar {
+  display: none;
+}
+
+.quick .btn {
+  white-space: nowrap;
+}
+
+/* =========================================================
    DASHBOARD / PÁGINAS
-===================================================== */
+========================================================= */
 
 #dashboard.view.on,
 #templates.view.on,
@@ -933,76 +751,41 @@ button {
 #history.view.on,
 #plans.view.on,
 #settings.view.on {
+  display: block;
   overflow-y: auto;
-
   padding: 28px;
-}
-
-.page {
-  width: 100%;
-  max-width: 1050px;
-
-  margin: 0 auto;
-
-  padding: 0;
-}
-
-.page-inner {
-  width: 100%;
-  max-width: 1050px;
-  margin: 0 auto;
-}
-
-.page h1 {
-  margin: 0 0 6px;
-
-  font-size: 25px;
-}
-
-.page-subtitle {
-  margin: 0 0 24px;
-
-  color: #777;
-
-  font-size: 14px;
-}
-
-.cards {
-  display: grid;
-
-  grid-template-columns: repeat(3, 1fr);
-
-  gap: 14px;
-
-  margin-top: 20px;
-}
-
-.card {
-  padding: 18px;
-
-  border: 1px solid #e5e5e5;
-
-  border-radius: 14px;
-
-  background: #fff;
-}
-
-.card h3 {
-  margin: 0 0 8px;
-
-  font-size: 16px;
 }
 
 .panel {
   width: 100%;
-
-  padding: 20px;
-
+  max-width: 1000px;
+  margin: 0 auto;
   border: 1px solid #e5e5e5;
-
-  border-radius: 15px;
-
+  border-radius: 14px;
   background: #fff;
+  padding: 20px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid #e5e5e5;
+  border-radius: 13px;
+  background: #fff;
+  padding: 18px;
+}
+
+.card h3 {
+  margin: 0 0 8px;
+}
+
+.metric {
+  font-size: 27px;
+  font-weight: 700;
 }
 
 .grid {
@@ -1012,17 +795,13 @@ button {
 
 .row {
   display: flex;
-
   align-items: center;
-
   justify-content: space-between;
-
   gap: 12px;
 }
 
 .listitem {
   padding: 14px 0;
-
   border-bottom: 1px solid #eee;
 }
 
@@ -1030,14 +809,13 @@ button {
   border-bottom: 0;
 }
 
-.small {
-  font-size: 12px;
-}
-
-.metric {
-  font-size: 27px;
-
-  font-weight: 800;
+.badge {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 11px;
 }
 
 .green {
@@ -1048,15 +826,13 @@ button {
   color: #6d28d9;
 }
 
-/* =====================================================
+/* =========================================================
    PLANOS
-===================================================== */
+========================================================= */
 
 .plans {
   display: grid;
-
   grid-template-columns: repeat(3, 1fr);
-
   gap: 15px;
 }
 
@@ -1065,130 +841,127 @@ button {
 }
 
 .price.featured {
-  border: 2px solid #171717;
+  border-color: #222;
+  box-shadow: 0 5px 18px rgba(0,0,0,.06);
 }
 
 .price strong {
   font-size: 28px;
 }
 
-/* =====================================================
+.price ul {
+  padding-left: 18px;
+  color: #555;
+  line-height: 1.9;
+}
+
+/* =========================================================
    MOBILE
-===================================================== */
+========================================================= */
 
 @media (max-width: 800px) {
 
+  body {
+    overflow: hidden;
+  }
+
   .side {
     position: fixed;
-
     top: 0;
+    bottom: 0;
     left: -270px;
-
-    z-index: 200;
 
     width: 260px;
 
-    transition: left 0.2s ease;
+    z-index: 100;
 
-    box-shadow:
-      8px 0 30px rgba(0, 0, 0, 0.12);
+    transition: left .2s ease;
+
+    box-shadow: 8px 0 25px rgba(0,0,0,.12);
   }
 
   body.menu-open .side {
     left: 0;
   }
 
-  .mobile-menu {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
+  .main {
+    width: 100%;
   }
 
   .topbar {
     height: 62px;
-
-    padding: 0 12px;
+    padding: 0 13px;
   }
 
-  .topbar h1 {
-    font-size: 16px;
+  .topbar > div:first-of-type {
+    flex: 1;
+    margin-left: 8px;
   }
 
-  .topbar p {
-    display: none;
-  }
-
-  .view {
-    height: calc(100vh - 62px);
+  .mobile-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111;
   }
 
   .messages {
-    padding: 16px 10px 125px;
+    padding:
+      22px
+      12px
+      130px;
+    gap: 15px;
   }
 
-  .message-row {
-    margin-bottom: 15px !important;
+  /*
+    NO CELULAR:
+    a bolha fica realmente pequena,
+    como em um chat moderno.
+  */
+
+  .message-bubble {
+    max-width: 78vw !important;
+    padding: 10px 13px;
+    border-radius: 15px;
+    font-size: 15px;
+    line-height: 1.45;
   }
 
-  .message-wrap {
-    max-width: 94vw !important;
+  .message-vertex .vertex-avatar {
+    width: 31px;
+    height: 31px;
+    min-width: 31px;
+    margin-right: 7px;
   }
 
-  .message-row.message-vertex .message-bubble {
-    max-width: calc(100vw - 68px) !important;
-
-    padding: 9px 12px !important;
-
-    font-size: 15px !important;
+  .vertex-avatar svg {
+    width: 19px;
+    height: 19px;
   }
 
-  .message-row.message-user .message-bubble {
-    max-width: calc(100vw - 80px) !important;
-
-    padding: 9px 12px !important;
-
-    font-size: 15px !important;
-  }
-
-  .vertex-avatar,
   .user-message-avatar {
-    width: 29px;
-    height: 29px;
-
-    flex-basis: 29px;
-  }
-
-  .tools {
-    padding: 0 10px 7px;
+    width: 31px;
+    height: 31px;
+    min-width: 31px;
   }
 
   .composer {
-    width: calc(100% - 16px);
-
-    margin-bottom: 9px;
-
-    border-radius: 19px;
+    width: calc(100% - 18px);
+    bottom: 9px;
+    min-height: 56px;
+    border-radius: 18px;
   }
 
   .composer textarea {
     font-size: 15px;
+    min-height: 40px;
   }
 
   .plus-button,
   .send-button {
-    width: 39px;
-    height: 39px;
-
-    flex-basis: 39px;
-  }
-
-  .plus-menu {
-    bottom: 49px;
-
-    left: 0;
-
-    width: 205px;
+    width: 41px;
+    height: 41px;
+    min-width: 41px;
   }
 
   #dashboard.view.on,
@@ -1198,7 +971,7 @@ button {
   #history.view.on,
   #plans.view.on,
   #settings.view.on {
-    padding: 20px 14px;
+    padding: 17px 12px;
   }
 
   .cards,
@@ -1206,7 +979,29 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .auth-card {
-    padding: 24px 20px;
+  .panel {
+    padding: 16px;
+  }
+}
+
+/* =========================================================
+   CELULARES PEQUENOS
+========================================================= */
+
+@media (max-width: 430px) {
+
+  .messages {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+
+  .message-bubble {
+    max-width: 76vw !important;
+    font-size: 14px;
+    padding: 9px 12px;
+  }
+
+  .composer {
+    width: calc(100% - 12px);
   }
 }
